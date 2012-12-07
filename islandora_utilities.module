@@ -5,121 +5,113 @@ function islandora_utilities_permission() {
 }
 
 function islandora_utilities_menu() {
-  
+
   $items['admin/islandora/utilities'] = array(
     'title' => 'Islandora Utilities',
     'description' => 'Advanced admin functionality for Islandora',
     'page callback' => 'islandora_utilities_admin_page',
-    'access callback' => TRUE, 
+    'page arguments' => array('home'),
+    'access callback' => TRUE,
   );
-  
+
   $items['admin/islandora/utilities/home'] = array(
     'title' => 'Home',
     'description' => 'Islandora Utility settings',
     'page callback' => 'islandora_utilities_admin_page',
     'page arguments' => array('home'),
-    'access callback' => TRUE, 
+    'access callback' => TRUE,
     'type' => MENU_DEFAULT_LOCAL_TASK,
   );
-  
+
   $items['admin/islandora/utilities/settings'] = array(
     'title' => 'Settings',
     'description' => 'Islandora Utility settings',
-    'page callback' => 'islandora_utilities_admin_page',
-    'page arguments' => array('settings'),
-    'access callback' => TRUE, 
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('islandora_utilities_settings_form'),
+    'access callback' => TRUE,
+    'file' => 'admin/islandora_utilities.admin.inc',
     'type' => MENU_LOCAL_TASK,
   );
-  
-  $items['admin/islandora/utilities/export'] = array(
-    'title' => 'Export',
-    'description' => 'Export object or datastream',
-    'page callback' => 'islandora_utilities_admin_page',
-    'page arguments' => array('export'),
-    'access callback' => TRUE, 
-    'type' => MENU_LOCAL_ACTION,
-  );
-  
-  $items['admin/islandora/utilities/find'] = array(
-    'title' => 'Find',
-    'description' => 'Find / replace object or datastream xml',
-    'page callback' => 'islandora_utilities_admin_page',
-    'page arguments' => array('find'),
-    'access callback' => TRUE, 
-    'type' => MENU_LOCAL_ACTION,
-  );
-  
-  $items['admin/islandora/utilities/validate'] = array(
-    'title' => 'Validate',
-    'description' => 'Validate objects',
-    'page callback' => 'islandora_utilities_admin_page',
-    'page arguments' => array('validate'),
-    'access callback' => TRUE, 
-    'type' => MENU_LOCAL_ACTION,
-  );
-  
+
   return $items;
 }
 
 function islandora_utilities_admin_page($tab = '') {
   switch ($tab) {
-    case 'settings' :
-      $output = drupal_get_form('islandora_utilities_settings_form');
-      break;
-    case 'validate' :
-      drupal_set_title('Validate Objects');
-      $output = drupal_get_form('islandora_utilities_validate_object_form');
-      break;
     case 'home' :
     default :
-      $output = islandora_utilities_home();
-      
+      $output = drupal_get_form('islandora_utilities_form');
+
   }
   return $output;
 }
 
-function islandora_utilities_home() {
-  $output = 'This is the home for the islandora utilities';
-  
-  return $output;
-}
-function islandora_utilities_validate_object_form($form, &$form_state) {
-  
-  $form['islandora_utilities_validate_object_query'] = array(
+function islandora_utilities_form($form, &$form_state) {
+  $form['islandora_utilities_query'] = array(
     '#type' => 'fieldset',
     '#title' => t('RI Query'),
     '#collapsible' => TRUE,
     '#collapsed' => FALSE,
     );
-  
-  $form['islandora_utilities_validate_object_query']['query'] = array(
+
+  $form['islandora_utilities_query']['query'] = array(
     '#type' => 'textarea',
     '#title' => t('Query'),
     );
-  
-  $form['islandora_utilities_validate_object_pids'] = array(
+
+  $form['islandora_utilities_query']['history'] = array(
+    '#type' => 'item',
+    '#markup' => t('save query history to db'),
+    );
+
+  $form['islandora_utilities_pids'] = array(
     '#type' => 'textarea',
     '#title' => t('List of pids'),
     '#description' => t('space seperated list of pids'),
     '#default_value' => 'islandora:299',
     );
+
+  $plugins  = module_invoke_all('islandora_utilities_plugin');
+
+  $form_state['storage']['plugins'] = $plugins;
+
+  $form['islandora_utilities_plugins'] = array(
+    '#type' => 'fieldset',
+    '#title' => t('Plugins'),
+    '#collapsible' => TRUE,
+    '#collapsed' => FALSE,
+    );
+  /**
+   *
+   * @todo make this re-arrangable for doing a order of operatations on a object
+   */
+  foreach($plugins as $plugin => $details) {
+    dsm($plugin,'plugin');
+    $form['islandora_utilities_plugins']["plugin-$plugin"] = array(
+      '#type' => 'checkbox',
+      '#title' => t($details['title']),
+      '#description' => t($details['description']),
+    );
+  }
   $form['submit'] = array(
     '#type' => 'submit',
-    '#value' => 'Validate Objects'
-    
+    '#value' => 'Submit'
   );
-  
+
+  return $form;
+}
+function islandora_utilities_validate_object_form($form, &$form_state) {
+
+
   return $form;
 }
 
 
-function islandora_utilities_validate_object_form_submit($form, &$form_state) {
+function islandora_utilities_form_submit($form, &$form_state) {
   module_load_include('inc', 'islandora', 'includes/tuque');
   module_load_include('inc', 'islandora', 'includes/utilities');
   $values = $form_state['values'];
-  dsm($form_state,'form state');
-  
-  $pids_raw = explode(' ', $values['islandora_utilities_validate_object_pids']);
+  $pids_raw = explode(' ', $values['islandora_utilities_pids']);
 
   $pids = array();
   foreach ($pids_raw as $pid) {
@@ -128,20 +120,121 @@ function islandora_utilities_validate_object_form_submit($form, &$form_state) {
     }
   }
 
-  islandora_utilities_validate_object($pids);
-  
+  islandora_utilities_process_objects($pids, $form_state);
+
   return $form;
+}
+
+function islandora_utilities_process_objects($pids = array(), $form_state) {
+  module_load_include('inc', 'islandora', 'includes/IslandoraTuque');
+  module_load_include('inc', 'islandora', 'includes/utilities');
+  dsm($form_state,'formy');
+  $output = array();
+
+  $plugins_raw = $form_state['storage']['plugins'];
+  $plugins = array();
+
+  foreach($plugins_raw as $plugin => $details) {
+    if($form_state['values']["plugin-$plugin"]) {
+      $plugins[$plugin] = $details;
+    }
+  }
+
+  foreach($plugins as $plugin) {
+    if($plugin['module'] && $plugin['file']) {
+    $path = drupal_get_path('module', $plugin['module']) . '/' . $plugin['file'];
+    dsm($path,'path');
+    //if(is_readable($path)) {
+      dsm('file..is readable.');
+      require_once($path);
+dsm(file_get_contents($path), 'content');
+      $plugin_class = $plugin['class'];
+      $plugin_function = $plugin['function'];
+      dsm($plugin_class,'class');
+      dsm($plugin_function, 'function');
+      $run = FALSE;
+      if (class_exists($plugin_class)) {
+        dsm('1111');
+        $implementation = new $plugin_class();
+
+        if(method_exists($implementation, $plugin_function)) {
+          dsm('ggggggg');
+          $run = TRUE;
+          unset($implementation);
+        }
+        else {
+          dsm('func is missing');
+        }
+      }
+      else {
+          dsm('class is missing');
+      }
+
+      if ($run) {
+        foreach($pids as $pid) {
+          if($fedora_object = islandora_object_load($pid)) {
+            $implementation = new $plugin_class($fedora_object);
+            dsm($implementation,'imp...');
+            $implementation->$plugin_function();
+            $output[] = $implementation->get_results(); //work this out
+
+          }
+        }
+
+      }
+      else {
+        dsm('cant run class/function');
+      }
+
+      /*}
+      else {
+        dsm('file is not readable');
+      }*/
+    }
+
+  }
+
+
+
+
+}
+
+function islandora_utilities_islandora_utilities_plugin() {
+  return array(
+    'validate' => array (
+      'title' => 'Validate Objects',
+      'module' => 'islandora_utilities',
+      'file' => 'IslandoraUtilityPlugin.inc',
+      'class' => 'IslandoraUtilityPlugin',
+      'function' => "process",
+      'description' => 'validate objects and ds against this...',
+      'what' => 'else?'
+    ),
+    'bob' => array (
+      'title' => 'bob',
+      'module' => 'module',
+      'file' => 'bob.inc',
+      'class' => 'classie',
+      'function' => "bob",
+      'description' => 'bobob',
+      'what' => 'else?'
+    ),
+  );
+}
+
+function bob($fedora_object) {
+  dsm($fedora_object,'objects');
 }
 
 function islandora_utilities_validate_object($pids = array()) {
   module_load_include('inc', 'islandora', 'includes/IslandoraTuque');
   module_load_include('inc', 'islandora', 'includes/utilities');
-  
+
   $results = array();
-  
+
   foreach($pids as $pid) {
     if($fedora_object = islandora_object_load($pid)) {
-   
+
       $models_object = $fedora_object->models;
       $datastreams_object = $fedora_object->repository->api->a->listDatastreams($pid);
       $datastreams_object_content_model = islandora_get_datastreams_requirements($fedora_object);
@@ -207,7 +300,7 @@ function islandora_utilities_validate_object($pids = array()) {
 }
 
 /**
- * 
+ *
  * @param type $results
  *  array (
  *    array(
@@ -231,7 +324,7 @@ function islandora_utilities_write_result($results = array()) {
     if($result['type'] == 'status' && !variable_get('islandora_utilities_output_settings_output_everything', '')) {
       continue;
     }
-    
+
     if(variable_get('islandora_utilities_output_settings_output_screen', '')) {
       drupal_set_message('<pre>'.$result['type'] . "\t" . $result['pid'] . "\t" . $result['message'].'</pre>', 'status');
     }
@@ -240,7 +333,7 @@ function islandora_utilities_write_result($results = array()) {
       fwrite($fp, $text."\r");
     }
   }
-  
+
   if(variable_get('islandora_utilities_output_settings_output_file', '')) {
     fclose($fp);
     drupal_set_message(t('View results here >> '.l('View', $base_url.'/'.$results_file)));
@@ -249,234 +342,4 @@ function islandora_utilities_write_result($results = array()) {
 
 function islandora_utilities_clean_result_files() {
   //foreach file in drupal file dir that starts with islandora_utilites - unlink
-}
-
-function islandora_utilities_settings_form($form, &$form_state) {
-  global $user;
-  module_load_include('inc', 'islandora', 'includes/IslandoraTuque');
-
-  if(variable_get('islandora_utilities_remote_islandora_base_url', '')) {
-    $url = variable_get('islandora_utilities_remote_islandora_base_url', '');
-    if(!variable_get('islandora_utilities_remote_islandora_drupal_filter', '')) {
-      $remote_user = new stdClass();
-      $remote_user->name = variable_get('islandora_utilities_remote_islandora_username', 'fedoraAdmin');
-      $remote_user->pass = variable_get('islandora_utilities_remote_islandora_password', 'fedoraAdmin');
-      $remote_user->uid = -1;
-    }
-    else {
-      $remote_user = NULL;
-    }
-   
-    $remote_connection = new IslandoraTuque($remote_user, $url);
-    
-    try {
-      $info = $remote_connection->api->a->describeRepository();
-      
-    }
-    catch (RepositoryException $e) {
-      $info = FALSE;
-    }
-
-    if ($info) {
-      try {
-        $dc = $remote_connection->api->m->getDatastream('fedora-system:ContentModel-3.0', 'DC');
-      }
-      catch (RepositoryException $e) {
-        $dc = FALSE;
-      }
-    }
-
-    if ($info) {
-      if ($dc) {
-        $confirmation_message = '<img src="' . url('misc/watchdog-ok.png') . '"/>'
-          . t('Successfully connected to Fedora Server (Version !version).', array('!version' => $info['repositoryVersion']));
-      }
-      else {
-        $confirmation_message = '<img src="' . url('misc/watchdog-warning.png') . '"/>'
-          . t('Unable to authenticate when connecting to to Fedora Server (Version !version). Please configure the !filter.', array('!version' => $info['repositoryVersion'], '!filter' => 'Drupal Filter'));
-      }
-    }
-    else {
-      $confirmation_message = '<img src="' . url('misc/watchdog-error.png') . '"/> '
-        . t('Unable to connect to Fedora server at !islandora_url', array('!islandora_url' => $url));
-    }
-    unset($remote_connection);
-  }
-  else {
-    $confirmation_message = '<img src="' . url('misc/watchdog-warning.png') . '"/>'
-      . t('Settings are not set.');
-  }
-
-  $form['islandora_utilities_output_settings'] = array(
-    '#type' => 'fieldset',
-    '#title' => t('Settings for output'),
-    '#collapsible' => TRUE,
-    '#collapsed' => FALSE,
-    );
-  $form['islandora_utilities_output_settings']['islandora_utilities_output_settings_output_everything'] = array(
-    '#type' => 'checkbox',
-    '#title' => t('Output everything'),
-    '#default_value' => variable_get('islandora_utilities_output_settings_output_everything', ''),
-    '#description' => t("If not checked, only warnings will be in the output"),
-  );
-  
-  $form['islandora_utilities_output_settings']['islandora_utilities_output_settings_output_screen'] = array(
-    '#type' => 'checkbox',
-    '#title' => t('Output to drupal_set_message'),
-    '#default_value' => variable_get('islandora_utilities_output_settings_output_screen', ''),
-  );
-  
-  $form['islandora_utilities_output_settings']['islandora_utilities_output_settings_output_file'] = array(
-    '#type' => 'checkbox',
-    '#title' => t('Output to txt file'),
-    '#default_value' => variable_get('islandora_utilities_output_settings_output_file', ''),
-    '#description' => t("Dumps file into the drupal files dir"),
-  );
-  
-  $form['islandora_utilities_validate_object_settings'] = array(
-    '#type' => 'fieldset',
-    '#title' => t('Validate object settings'),
-    '#description' => t("Settings for validating objects and datastreams"),
-    '#collapsible' => TRUE,
-    '#collapsed' => FALSE,
-    );
-  
-   $form['islandora_utilities_validate_object_settings']['islandora_utilities_validate_object_settings_content_models'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Content Model make this into a table form'),
-    '#default_value' => variable_get('islandora_utilities_validate_object_settings_content_models', ''), 
-    );
-   
-   $form['islandora_utilities_validate_object_settings']['islandora_utilities_validate_object_settings_datastream_ids'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Datastreams ids'),
-    '#description' => t('Space seperated list of datastreams for the above content model'),
-    '#default_value' => variable_get('islandora_utilities_validate_object_settings_datastream_ids', ''),
-  );
-   
-   
-   $form['islandora_utilities_validate_object_settings']['add_content_model'] = array(
-    '#type' => 'button',
-    '#value' => t('Add Content Model'),
-    '#suffix' => '</div>',
-    '#ajax' => array(
-      'event' => 'click',
-      'callback' => 'islandora_utilities_validate_object_settings_add_content_model',
-      'wrapper' => 'islandora_utilities_validate_object_settings',
-      'method' => 'replace',
-    ),
-  );
-   
-   
-   $form['islandora_utilities_validate_object_settings']['islandora_utilities_validate_object_settings_datastream_ids_merge'] = array(
-     '#type' => 'checkbox',
-      '#title' => t('Merge datastream ids with requirments from object content models'),
-      '#default_value' => variable_get('islandora_utilities_validate_object_settings_datastream_ids_merge', ''),
-      '#description' => t('Checking this will validate against all DS ids from the content model, with the addional ones mentioned above '),     
-   );
-   
-   $form['islandora_utilities_validate_object_settings']['islandora_utilities_validate_object_settings_datastream_size_zero'] = array(
-     '#type' => 'checkbox',
-      '#title' => t('Check for zero byte datastreams (-1)'),
-      '#default_value' => variable_get('islandora_utilities_validate_object_settings_datastream_size_zero', ''),
-   );
-   
-  $query = "select \$object from <#ri>
-    where
-    \$object <fedora-model:state> <info:fedora/fedora-system:def/model#Active>
-    and \$object <fedora-model:hasModel> <info:fedora/fedora-system:ContentModel-3.0
-    
-  order by \$object";
-  
-  $connection = new IslandoraTuque();
-  
-  $form['islandora_utilities_remote'] = array(
-    '#type' => 'fieldset',
-    '#title' => t('Remote fedora settings'),
-    '#description' => t("Used for importing and exporting objects and datastream between two fedora instances"),
-    '#collapsible' => TRUE,
-    '#collapsed' => FALSE,
-    );
-  
-  $form['islandora_utilities_remote']['islandora_utilities_remote_islandora_enable'] = array(
-    '#type' => 'checkbox',
-    '#title' => t('Enable remote connection'),
-    '#default_value' => variable_get('islandora_utilities_remote_islandora_enable', ''),
-    '#description' => t('Do we need this? Recommend turing this off when not in use'),
-  );
-  
-  $form['islandora_utilities_remote']['islandora_utilities_remote_islandora_base_url'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Remote fedora base URL'),
-    '#default_value' => variable_get('islandora_utilities_remote_islandora_base_url', ''),
-    '#description' => t('Rest API'),
-  );
-  
-  $form['islandora_utilities_remote']['islandora_utilities_remote_islandora_drupal_filter'] = array(
-    '#type' => 'checkbox',
-    '#title' => t('Use drupal filter'),
-    '#default_value' => variable_get('islandora_utilities_remote_islandora_drupal_filter', ''),
-    '#description' => t('If checked, the import / export functionality will use your drupal user / password for authentication'),
-  );
-  $form['islandora_utilities_remote']['islandora_utilities_remote_islandora_username'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Remote fedora username'),
-    '#default_value' => variable_get('islandora_utilities_remote_islandora_username', ''),
-  );
-  
-  $form['islandora_utilities_remote']['islandora_utilities_remote_islandora_password'] = array(
-    '#type' => 'textfield',
-    '#title' => t('Remote fedora password'),
-    '#description' => t('WARNING! This password is stored in plain text form.'),
-    '#default_value' => variable_get('islandora_utilities_remote_islandora_password', ''),
-  );
-  
-  $form['islandora_utilities_remote']['islandora_utilities_remote_validate_connection'] = array(
-    '#type' => 'item',
-    '#title' => t('Validate remote connection'),
-    '#markup' => $confirmation_message,
-  );
-  
-    
-  
-  return system_settings_form($form);//$form;
-  
-}
-
-function islandora_utilities_validate_object_settings_add_content_model($form, &$form_state) {
-  //do some processing
-  
-}
-
-
-function islandora_utilities_settings_submit($form, &$form_state) {
-  /*
-  dsm($form_state['input'],'ff');
-  $values = $form_state['input'];
-  dsm($values, 'values');
-  
-  variable_set('islandora_utilities_remote_fedora_base_url', $values['fedora_base_url']);
-  
-  if($values['fedora_base_url']) {
-     variable_set('islandora_utilities_remote_fedora_base_url', $values['fedora_base_url']);
-  }
-  
-  if($values['fedora_username']) {
-     variable_set('islandora_utilities_remote_fedora_username', $values['fedora_username']);
-  }
-  
-  if($values['drupal_filter']) {
-     variable_set('islandora_utilities_remote_fedora_drupal_filter', $values['drupal_filter']);
-  }
-  else {
-    variable_set('islandora_utilities_remote_fedora_drupal_filter', NULL);
-  }
-  
-  if($values['fedora_password']) {
-     variable_set('islandora_utilities_remote_fedora_password', $values['fedora_password']);
-  }
-  
-   
-  return $form;
-  */
 }
