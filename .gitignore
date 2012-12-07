@@ -1,2 +1,7 @@
+<<<<<<< HEAD
 # Mac OS X
 *.DS_Store
+=======
+*~
+.DS_Store
+>>>>>>> 59be05ab065c0afea492458c0d5e948beed06d8c
