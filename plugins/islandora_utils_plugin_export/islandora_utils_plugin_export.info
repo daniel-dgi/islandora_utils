@@ -1,0 +1,7 @@
+; $Id$
+name = Islandora Utils Plugin Export
+description = Export and sync objects between repos
+package = Islandora Tools
+version = 7.x-dev
+core = 7.x
+dependencies[] = islandora_utils
