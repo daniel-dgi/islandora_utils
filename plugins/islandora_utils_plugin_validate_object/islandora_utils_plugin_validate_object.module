@@ -1,0 +1,74 @@
+<?php
+
+function islandora_utils_plugin_validate_object_islandora_utils_plugin() {
+  return array(
+    'validate' => array (
+      'title' => 'Validate Objects',
+      'module' => 'islandora_utils_plugin_validate_object',
+      'file' => 'ValidateObjectPlugin.inc',
+      'class' => 'ValidateObjectPlugin',
+      'function' => "process",
+      'description' => 'Validate objects against content model requirements. Eg: missing datastreams or empty datastreams',
+      'what' => 'else?'
+    ),
+  );
+}
+
+
+function islandora_utils_plugin_validate_object_form_alter(&$form, &$form_state, $form_id) {
+  //dsm($form_id,'form id');
+  switch ($form_id) {
+    case 'islandora_utils_settings_form':
+    //case 'islandora_utils_form':
+
+      $form['islandora_utils_plugin_options']['islandora_utils_validate_object_settings'] = array(
+        '#type' => 'fieldset',
+        '#title' => t('Validate object settings'),
+        '#description' => t("Settings for validating objects and datastreams"),
+        '#collapsible' => TRUE,
+        '#collapsed' => FALSE,
+        );
+
+       $form['islandora_utils_plugin_options']['islandora_utils_validate_object_settings']['islandora_utils_validate_object_settings_content_models'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Content Model make this into a table form'),
+        '#default_value' => variable_get('islandora_utils_validate_object_settings_content_models', ''),
+        );
+
+       $form['islandora_utils_plugin_options']['islandora_utils_validate_object_settings']['islandora_utils_validate_object_settings_datastream_ids'] = array(
+        '#type' => 'textfield',
+        '#title' => t('Datastreams ids'),
+        '#description' => t('Space seperated list of datastreams for the above content model'),
+        '#default_value' => variable_get('islandora_utils_validate_object_settings_datastream_ids', ''),
+      );
+
+       $form['islandora_utils_plugin_options']['islandora_utils_validate_object_settings']['add_content_model'] = array(
+        '#type' => 'button',
+        '#value' => t('Add Content Model'),
+        '#suffix' => '</div>',
+        '#ajax' => array(
+          'event' => 'click',
+          'callback' => 'islandora_utils_validate_object_settings_add_content_model',
+          'wrapper' => 'islandora_utils_validate_object_settings',
+          'method' => 'replace',
+        ),
+      );
+
+       $form['islandora_utils_plugin_options']['islandora_utils_validate_object_settings']['islandora_utils_validate_object_settings_datastream_ids_merge'] = array(
+         '#type' => 'checkbox',
+          '#title' => t('Merge datastream ids with requirments from object content models'),
+          '#default_value' => variable_get('islandora_utils_validate_object_settings_datastream_ids_merge', ''),
+          '#description' => t('Checking this will validate against all DS ids from the content model, with the addional ones mentioned above '),
+       );
+
+       $form['islandora_utils_plugin_options']['islandora_utils_validate_object_settings']['islandora_utils_validate_object_settings_datastream_size_zero'] = array(
+         '#type' => 'checkbox',
+          '#title' => t('Check for zero byte datastreams (-1)'),
+          '#default_value' => variable_get('islandora_utils_validate_object_settings_datastream_size_zero', ''),
+       );
+
+
+    break;
+  }
+
+}

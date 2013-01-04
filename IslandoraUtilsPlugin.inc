@@ -13,8 +13,11 @@ class IslandoraUtilsPlugin {
    * Constructor
    */
   function IslandoraUtilsPlugin($pid = NULL, $form_state = NULL) {
+    module_load_include('inc', 'islandora', 'includes/tuque');
+
     if (isset($pid)) {
       $this->pid = $pid;
+      $this->fedora_object = islandora_object_load($pid);
     }
 
     if (isset($form_state)) {
@@ -23,7 +26,7 @@ class IslandoraUtilsPlugin {
   }
 
   public function process() {
-    dsm('getting here and there');
+    dsm('empty processing function');
   }
 
   protected function save_result($result = array()) {

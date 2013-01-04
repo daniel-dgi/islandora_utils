@@ -15,7 +15,7 @@ function islandora_utils_plugin_find_replace_islandora_utils_plugin() {
 
 
 function islandora_utils_plugin_find_replace_form_alter(&$form, &$form_state, $form_id) {
-  dsm($form_id,'form id');
+  //dsm($form_id,'form id');
   switch ($form_id) {
     case 'islandora_utils_settings_form':
     case 'islandora_utils_form':
@@ -24,6 +24,25 @@ function islandora_utils_plugin_find_replace_form_alter(&$form, &$form_state, $f
         '#title' => t('Plugin Find & replace Options'),
         '#collapsible' => TRUE,
         '#collapsed' => FALSE,
+      );
+
+      $form['islandora_utils_plugin_options']['islandora_utils_plugin_find_replace']['find_string'] = array(
+        '#type' => 'textara',
+        '#title' => t('Find string'),
+      );
+
+      $form['islandora_utils_plugin_options']['islandora_utils_plugin_find_replace']['find_xpath'] = array(
+        '#type' => 'textara',
+        '#title' => t('Find xpath'),
+      );
+
+      $form['islandora_utils_plugin_options']['islandora_utils_plugin_find_replace']['replace'] = array(
+        '#type' => 'textara',
+        '#title' => t('Replace'),
+      );
+      $form['islandora_utils_plugin_options']['islandora_utils_plugin_find_replace']['replace_'] = array(
+        '#type' => 'checkbox',
+        '#title' => t('Replace'),
       );
 
 

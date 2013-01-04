@@ -15,7 +15,7 @@ function islandora_utils_plugin_export_islandora_utils_plugin() {
 
 
 function islandora_utils_plugin_export_form_alter(&$form, &$form_state, $form_id) {
-  dsm($form_id,'form id');
+  //dsm($form_id,'form id');
   switch ($form_id) {
     case 'islandora_utils_settings_form':
     case 'islandora_utils_form':

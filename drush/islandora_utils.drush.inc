@@ -11,10 +11,10 @@
 /**
  * Implements hook_drush_command.
  */
-function islandora_utilities_drush_command() {
+function islandora_utils_drush_command() {
   return array(
     'islandora-purge' => array(
-      'callback' => 'islandora_utilities_purge',
+      'callback' => 'islandora_utils_purge',
       'arguments' => array(
         'pid' => 'The PID of the object to purge.',
       ),
@@ -37,7 +37,7 @@ function islandora_utilities_drush_command() {
     ),
     // @todo Implement
     'islandora-set-state' => array(
-      'callback' => 'islandora_utilities_set_state',
+      'callback' => 'islandora_utils_set_state',
       'description' => 'Changes the given state of the object identified by the provided PID. The options are "A", "I", "D"',
       'examples' => array(
         'drush islandora-set-state PID STATE',
@@ -46,7 +46,7 @@ function islandora_utilities_drush_command() {
       'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN, // We can pass in users id on the command line using drush -u.
     ),
     'islandora-cp-datastream' => array(
-      'callback' => 'islandora_utilities_copy_datastream',
+      'callback' => 'islandora_utils_copy_datastream',
       'description' => 'Copies the given datastream of the given object into another datastream if it is not present.',
       'examples' => array(
         'drush islandora-cp-datastream PID STATE',
@@ -55,7 +55,7 @@ function islandora_utilities_drush_command() {
       'bootstrap' => DRUSH_BOOTSTRAP_DRUPAL_LOGIN, // We can pass in users id on the command line using drush -u.
     ),
     'islandora-ri-search' => array(
-      'callback' => 'islandora_utilities_ri_search',
+      'callback' => 'islandora_utils_ri_search',
       'description' => 'Returns a list of results of the search.',
       'arguments' => array(
         'query' => 'The itql/sparql query to execute required if --file is not provided',
@@ -80,16 +80,16 @@ function islandora_utilities_drush_command() {
  *
  * @param string $pid
  */
-function islandora_utilities_purge($pid) {
+function islandora_utils_purge($pid) {
   static $purged = array();
-  $repo = islandora_utilities_repository();
+  $repo = islandora_utils_repository();
   if (drush_get_option('recursive')) {
     $query = 'select $o from <#ri> where ($o <fedora-rels-ext:isMemberOf> <info:fedora/' . $pid . '> or $o <fedora-rels-ext:isMemberOfCollection> <info:fedora/' . $pid . '>)';
     $results = $repo->ri->itqlQuery($query); // Immediate children
     $results = array_map(function($o) { return $o['o']['value']; }, $results); // PIDs only.
     $results = array_diff($results, $purged); // Only call the function for objects not marked as purged.
     $purged = array_merge($purged, $results, array($pid)); // Prevent circular dependencies and infinite recursion.
-    array_walk($results, 'islandora_utilities_purge');
+    array_walk($results, 'islandora_utils_purge');
   }
   try {
     $label = $repo->getObject($pid)->label;
@@ -104,8 +104,8 @@ function islandora_utilities_purge($pid) {
 /**
  * Validate the arguments provided to this drush command.
  */
-function islandora_utilities_purge_validate() {
-  return islandora_utilities_include_tuque(); // @todo add additional checks.
+function islandora_utils_purge_validate() {
+  return islandora_utils_include_tuque(); // @todo add additional checks.
 }
 
 /**
@@ -118,8 +118,8 @@ function islandora_utilities_purge_validate() {
  * @param string $pid
  *   The objects PID.
  */
-function islandora_utilities_copy_datastream($src, $dest, $pid = NULL) {
-  $repo = islandora_utilities_repository();
+function islandora_utils_copy_datastream($src, $dest, $pid = NULL) {
+  $repo = islandora_utils_repository();
   if (empty($pid)) {
     stream_set_blocking(STDIN, FALSE);
     do {
@@ -128,7 +128,7 @@ function islandora_utilities_copy_datastream($src, $dest, $pid = NULL) {
       if ($pid === FALSE || empty($pid)) {
         break;
       }
-      islandora_utilities_copy_datastream($src, $dest, $pid);
+      islandora_utils_copy_datastream($src, $dest, $pid);
     } while (!feof(STDIN));
     return TRUE;
   }
@@ -165,8 +165,8 @@ function islandora_utilities_copy_datastream($src, $dest, $pid = NULL) {
 /**
  * Validate the arguments provided to this drush command.
  */
-function islandora_utilities_copy_datastream_validate() {
-  return islandora_utilities_include_tuque(); // @todo add additional checks.
+function islandora_utils_copy_datastream_validate() {
+  return islandora_utils_include_tuque(); // @todo add additional checks.
 }
 
 /**
@@ -178,8 +178,8 @@ function islandora_utilities_copy_datastream_validate() {
  * @return string
  *   The comma delimited results of the query.
  */
-function islandora_utilities_ri_search($query = NULL) {
-  $repo = islandora_utilities_repository();
+function islandora_utils_ri_search($query = NULL) {
+  $repo = islandora_utils_repository();
   if (($file = drush_get_option('file')) !== NULL) {
     $query = file_get_contents($file);
   }
@@ -209,8 +209,8 @@ function islandora_utilities_ri_search($query = NULL) {
 /**
  * Validate the arguments provided to this drush command.
  */
-function islandora_utilities_ri_search_validate() {
-  return islandora_utilities_include_tuque(); // @todo add additional checks.
+function islandora_utils_ri_search_validate() {
+  return islandora_utils_include_tuque(); // @todo add additional checks.
 }
 
 /**
@@ -219,7 +219,7 @@ function islandora_utilities_ri_search_validate() {
  * @return Boolean
  *   TRUE if the API was included, FALSE otherwise.
  */
-function islandora_utilities_include_tuque() {
+function islandora_utils_include_tuque() {
   if (!file_exists('sites/all/libraries/tuque')) {
     return drush_set_error(DRUSH_FRAMEWORK_ERROR, dt('The Tuque API was not found and it is a requirement for use of the islandora drush commands.'));
   }
@@ -241,7 +241,7 @@ function islandora_utilities_include_tuque() {
  * @return FedoraRepository
  *   The default fedora repository for this site.
  */
-function islandora_utilities_repository() {
+function islandora_utils_repository() {
   static $repository = NULL;
   if (!isset($repository)) {
     global $user;

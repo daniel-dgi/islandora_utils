@@ -1,0 +1,7 @@
+; $Id$
+name = Islandora Utils Plugin Validate Object
+description = Validate objects against content model requirements. Eg: missing datastreams or empty datastreams
+package = Islandora Tools
+version = 7.x-dev
+core = 7.x
+dependencies[] = islandora_utils

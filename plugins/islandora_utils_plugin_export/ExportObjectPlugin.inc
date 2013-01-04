@@ -1,7 +1,7 @@
 <?php
 
-module_load_include('inc', 'islandora_utils', 'IslandoraUtilityPlugin');
-class ExportObjectPlugin extends IslandoraUtilityPlugin {
+module_load_include('inc', 'islandora_utils', 'IslandoraUtilsPlugin');
+class ExportObjectPlugin extends IslandoraUtilsPlugin {
 
   protected $pid;
   protected $fedora_object;
