@@ -58,10 +58,10 @@ function islandora_utils_form($form, &$form_state) {
   $form['islandora_utils_query']['islandora_utils_query_query'] = array(
     '#type' => 'textarea',
     '#title' => t('Query'),
-    '#default_valueee' => 'select $object from <#ri>
+    '#default_value' => 'select $object from <#ri>
      where
      $object <fedora-model:state> <info:fedora/fedora-system:def/model#Active>
-     and $object <fedora-rels-ext:isMemberOf> <info:fedora/islandora:288>
+     and $object <fedora-model:hasModel> <info:fedora/islandora:pageCModel>
      order by $object',
     //
     );
@@ -120,10 +120,39 @@ function islandora_utils_form_submit($form, &$form_state) {
   module_load_include('inc', 'islandora', 'includes/tuque');
   module_load_include('inc', 'islandora', 'includes/utilities');
 
+  $batch = array(
+    'title' => t('Process Batch'),
+    'operations' => array(),
+    'finished' => 'islandora_utils_process_complete',
+  );
+
+
+  $batch['operations'][] = array('islandora_utils_getpids', array($form_state));
+  $batch['operations'][] = array('islandora_utils_process_objects', array($form_state));
+
+  //foreach ($pids as $pid) {
+    //$batch['operations'][] = array('islandora_utils_bob2', $pid);
+  //}
+  //$batch['operations'][] = array('islandora_utils_bob2', $form_state);
+
+  //$batch['operations'][] = array('islandora_utils_process_objects', $form_state);
+
+  batch_set($batch);
+  //return $form;
+}
+
+function islandora_utils_bob2($pid, &$context) {
+  dsm($pid, 'pid');
+}
+
+function islandora_utils_getpids($form_state, &$context) {
+  module_load_include('inc', 'islandora', 'includes/tuque');
+  module_load_include('inc', 'islandora', 'includes/utilities');
+
+  $context['message'] = "Compiling PIDS";
   $pids = array();
   $values = $form_state['values'];
 
-  //dsm($values, 'values');
   $objects = array();
 
   if (!empty($values['islandora_utils_query_query'])) {
@@ -151,17 +180,23 @@ function islandora_utils_form_submit($form, &$form_state) {
       $pids[$pid] = $pid;
     }
   }
+  dsm($context, 'context');
+  $context['results']['pids'] = $pids;
+  foreach ($pids as $pid) {
 
-  islandora_utils_process_objects($pids, $form_state);
+  }
 
-  return $form;
 }
 
-function islandora_utils_process_objects($pids = array(), $form_state) {
+function islandora_utils_process_objects($form_state, &$context) {
   module_load_include('inc', 'islandora', 'includes/IslandoraTuque');
   module_load_include('inc', 'islandora', 'includes/utilities');
-  $results = array();
 
+  $context['message'] = "Processing PIDS";
+  $pids = $context['results']['pids'];
+  dsm($pids, 'pidsss');
+  $results = array();
+  dsm($context, 'bbbbbbb');
   $plugins_raw = $form_state['storage']['plugins'];
   $plugins = array();
 
@@ -196,23 +231,36 @@ function islandora_utils_process_objects($pids = array(), $form_state) {
     }
   }
 
-  $batch = array(
-    'title' => t('Object Update Tasks'),
-    'operations' => array(),
-    'finished' => 'islandora_utils_process_complete',
-  );
+  if(!isset($context['sandbox']['max'])) {
+    $context['sandbox']['max'] = 0;
+  }
+
+  if(!isset($context['sandbox']['progress'])) {
+    $context['sandbox']['progress'] = 0;
+  }
+
+
   //add drupal batch here
   foreach($plugins as $plugin) {
-    foreach($pids as $pid) {
-      $batch['operations'][] = array('islandora_utils_process_object', array($pid, $plugin, $form_state));
+    dsm($context['sandbox']['max'], 'max');
+    $context['sandbox']['max'] += count($pids);
 
+    foreach($pids as $pid) {
+      $context['sandbox']['progress']++;
+
+      $result = islandora_utils_process_object($pid, $plugin, $form_state);
+
+      if(!isset($context['results']['results'])) {
+        $context['results']['results'] = array();
+      }
+
+      $context['results']['results'] = array_merge($context['results']['results'], $result);
+      $context['message'] = "Running " . $plugin['plugin_class'] ."=>". $plugin['plugin_function'];
     }
   }
-  batch_set($batch);
-
 }
 
-function islandora_utils_process_object($pid, $plugin, $form_state, &$context) {
+function islandora_utils_process_object($pid, $plugin, $form_state) {
 
   $plugin_class = $plugin['class'];
   $plugin_function = $plugin['function'];
@@ -222,14 +270,13 @@ function islandora_utils_process_object($pid, $plugin, $form_state, &$context) {
 
   $implementation = new $plugin_class($pid, $form_state);
   $implementation->$plugin_function();
-  //$results = array_merge($results, $implementation->get_results()); //work this out
 
-  $context['results'] = array_merge($context['results'], $implementation->get_results()); //$context['results'][] = $implementation->get_results();
-  $context['message'] = "Running $plugin_class => $plugin_function";
+  return $implementation->get_results();
 }
 
 function islandora_utils_process_complete($success, $results, $operations) {
-  islandora_utils_write_result($results);
+  dsm($results,'complete function');
+  islandora_utils_write_result($results['results']);
 }
 
 /**
@@ -283,7 +330,7 @@ function islandora_utils_write_result($results = array()) {
     }
   }
   else {
-    drupal_set_message(t('No results'));
+    drupal_set_message(t('No resultsssss'));
   }
 
 }

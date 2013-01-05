@@ -5,7 +5,6 @@ class IslandoraUtilsPlugin {
   protected $pid;
   protected $fedora_object;
   protected $form_state;
-
   protected $results = array();
 
 

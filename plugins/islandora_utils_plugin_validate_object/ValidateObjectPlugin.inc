@@ -8,7 +8,7 @@ class ValidateObjectPlugin extends IslandoraUtilsPlugin {
    */
   function ValidateObjectPlugin($pid = NULL, $form_state = NULL) {
     parent::__construct($pid, $form_state);
-    }
+  }
 
 
   public function process() {
