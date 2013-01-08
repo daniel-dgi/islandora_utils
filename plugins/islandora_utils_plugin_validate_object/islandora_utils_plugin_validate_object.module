@@ -16,7 +16,6 @@ function islandora_utils_plugin_validate_object_islandora_utils_plugin() {
 
 
 function islandora_utils_plugin_validate_object_form_alter(&$form, &$form_state, $form_id) {
-  dsm($form_state, 'form state');
   switch ($form_id) {
     case 'islandora_utils_settings_form':
     //case 'islandora_utils_form':

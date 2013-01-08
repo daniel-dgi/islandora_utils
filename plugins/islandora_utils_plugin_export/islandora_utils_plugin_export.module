@@ -8,7 +8,7 @@ function islandora_utils_plugin_export_islandora_utils_plugin() {
       'file' => 'ExportObjectPlugin.inc',
       'class' => 'ExportObjectPlugin',
       'function' => "process",
-      'description' => 'Sync objects between 2 fedora and download objects locally',
+      'description' => 'Sync objects between 2 fedoras and download objects locally',
     ),
   );
 }
@@ -51,5 +51,22 @@ function islandora_utils_plugin_export_form_alter(&$form, &$form_state, $form_id
       );
     break;
   }
+
+}
+
+function islandora_utils_plugin_export_islandora_utils_plugin_process_complete($results = NULL) {
+  $export = $results['plugin_export'];
+
+  $file_name = 'structure.txt';
+  $file_dir = $export['download_file_dir'];
+  $structure_file = file_create_filename($file_name, $file_dir);
+  $fp = fopen($structure_file, 'w');
+
+  foreach ($export['file_list'] as $key => $value) {
+    $text = $value['pid'] . "\t" . $value['dsid'] . "\t" . $value['label'] . "\t" . $value['mimetype'] . "\t" . $value['filename'];
+    fwrite($fp, $text."\r");
+  }
+  fclose($fp);
+
 
 }

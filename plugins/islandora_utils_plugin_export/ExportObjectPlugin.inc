@@ -6,8 +6,8 @@ class ExportObjectPlugin extends IslandoraUtilsPlugin {
   /**
    * Constructor
    */
-  function ExportObjectPlugin($pid = NULL, $form_state = NULL) {
-    parent::__construct($pid, $form_state);
+  function ExportObjectPlugin($pid = NULL, $form_state = NULL, &$context = NULL) {
+    parent::__construct($pid, $form_state, $context);
   }
 
 
@@ -15,14 +15,38 @@ class ExportObjectPlugin extends IslandoraUtilsPlugin {
     module_load_include('inc', 'islandora', 'includes/IslandoraTuque');
     module_load_include('inc', 'islandora', 'includes/utilities');
 
-    dsm($this->form_state,'ffffffffgggggg');
     $values = $this->form_state['values'];
 
     if($values['islandora_utils_plugin_export_download']) {
-      //download object to computer
+      if(!isset($this->context['results']['plugin_export']['download_file_dir'])) {
+        $file_dir =  'public://islandora_utils_plugin_export-' . date('Y-m-d-h-i-s');
+        drupal_mkdir($file_dir);
+        //$file_name = 'islandora_utils_export'.date('Y-m-d-h:i:s').'.txt';
+        //$file_dir = variable_get('file_public_path', file_directory_temp());
+        //$results_file = file_create_filename($file_name, $file_dir);
 
+        $this->context['results']['plugin_export']['download_file_dir'] = $file_dir;
+      }
+
+      if(!isset($this->context['results']['plugin_export']['file_list'])) {
+        $this->context['results']['plugin_export']['file_list'] = array();
+      }
+      $datastreams = $this->fedora_object->repository->api->a->listDatastreams($this->fedora_object->id);
+
+      foreach ($datastreams as $dsid => $datastream) {
+        $file_name = $this->fedora_object->id . '-' . $dsid;
+        $this->context['results']['plugin_export']['file_list'][] = array(
+          'pid' => $this->fedora_object->id,
+          'dsid' => $dsid,
+          'label' => $datastream['label'],
+          'mimetype' => $datastream['mimetype'],
+          'filename' => $file_name,
+        );
+        $ds_content = $this->fedora_object->repository->api->a->getDatastreamDissemination($this->fedora_object->id, $dsid);
+        file_put_contents($this->context['results']['plugin_export']['download_file_dir'] . '/'. $file_name, $ds_content);
+      }
     }
-
+    /*
     if($values['islandora_utils_plugin_export_ingest_remote']) {
       if($this->pid) {
         $this->fedora_object = islandora_object_load($this->pid);
@@ -51,6 +75,7 @@ class ExportObjectPlugin extends IslandoraUtilsPlugin {
         dsm("can't ingest");
       }
     }
+
     if($values['islandora_utils_plugin_export_ingest_local']) {
       dsm('ingest local');
       //functionize this bit of code
@@ -89,6 +114,8 @@ class ExportObjectPlugin extends IslandoraUtilsPlugin {
 
 
     }
+     *
+     */
   }
 
 

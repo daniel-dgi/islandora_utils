@@ -5,13 +5,14 @@ class IslandoraUtilsPlugin {
   protected $pid;
   protected $fedora_object;
   protected $form_state;
+  protected $context;
   protected $results = array();
 
 
   /**
    * Constructor
    */
-  function IslandoraUtilsPlugin($pid = NULL, $form_state = NULL) {
+  function IslandoraUtilsPlugin($pid = NULL, $form_state = NULL, &$context = NULL) {
     module_load_include('inc', 'islandora', 'includes/tuque');
 
     if (isset($pid)) {
@@ -21,6 +22,10 @@ class IslandoraUtilsPlugin {
 
     if (isset($form_state)) {
       $this->form_state = $form_state;
+    }
+
+    if (isset($context)) {
+      $this->context = $context;
     }
   }
 

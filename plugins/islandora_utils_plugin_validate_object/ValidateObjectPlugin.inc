@@ -6,8 +6,8 @@ class ValidateObjectPlugin extends IslandoraUtilsPlugin {
   /**
    * Constructor
    */
-  function ValidateObjectPlugin($pid = NULL, $form_state = NULL) {
-    parent::__construct($pid, $form_state);
+  function ValidateObjectPlugin($pid = NULL, $form_state = NULL, &$context = NULL) {
+    parent::__construct($pid, $form_state, $context);
   }
 
 
