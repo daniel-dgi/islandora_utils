@@ -14,63 +14,65 @@ class ValidateObjectPlugin extends IslandoraUtilsPlugin {
   public function process() {
     module_load_include('inc', 'islandora', 'includes/IslandoraTuque');
     module_load_include('inc', 'islandora', 'includes/utilities');
-
-
-    $models_object = $this->fedora_object->models;
-    $datastreams_object = $this->fedora_object->repository->api->a->listDatastreams($this->fedora_object->id);
-    $datastreams_object_content_model = islandora_get_datastreams_requirements($this->fedora_object);
-
-    $models_raw = variable_get('islandora_utils_validate_object_settings_content_models', array());
-    $models = explode(' ', $models_raw);
-
-    $datastreams_raw = variable_get('islandora_utils_validate_object_settings_datastream_ids', ' ');
-    $datastreams = explode(' ', $datastreams_raw);
-    $datastreams = array_flip($datastreams);
-
+    $datastreams = array();
+    $object_models = $this->fedora_object->models;
     if(variable_get('islandora_utils_validate_object_settings_datastream_ids_merge', '')) {
-      $datastreams = array_merge($datastreams, $datastreams_object_content_model);
+      $content_model_datastreams = islandora_get_datastreams_requirements($this->fedora_object);
+      foreach ($content_model_datastreams as $key => $value) {
+        //dsm($key, 'cmodel dsid');
+        $datastreams[$key] = $key;
+      }
     }
 
-    $rels = $this->fedora_object->relationships->get();
+    $results = db_select('islandora_utils_plugin_validate_object_content_models', 'cmodel')
+      ->fields('cmodel', array('content_model_id', 'content_model_name', 'content_model_datastreams'))
+      ->condition('content_model_name', $object_models, 'IN')
+      ->execute()
+      ->fetchAllAssoc('content_model_id');
 
-    /*
-    dsm($models,'models');
-    dsm($models_object,'models object');
-    dsm($rels,'rels');
-    dsm($datastreams,'ds');
-    dsm($datastreams_object_content_model,'ds from comdel');
-    dsm($fedora_object,'obj');
-    */
-
-
-    foreach($models as $model) {
-      if(in_array($model, $models_object)) {
-        foreach($datastreams as $datastream => $value) {
-          if($ds = $this->fedora_object[$datastream]) {
-            if(variable_get('islandora_utils_validate_object_settings_datastream_size_zero', '')) {
-              if($ds->size == -1) {
-                $this->results[] = array(
-                  'type' => 'error',
-                  'pid' => $this->fedora_object->id,
-                  'message' => "Datastream ($datastream) is 0 bytes",
-                );
-              }
-              else {
-                $this->results[] = array(
-                  'type' => 'status',
-                  'pid' => $this->fedora_object->id,
-                  'message' => "Datastream ($datastream) is $ds->size bytes",
-                );
-              }
-            }
+    foreach ($results as $cmodel) {
+      $dsid_raw = explode(' ', $cmodel->content_model_datastreams);
+      //dsm($dsid_raw, 'raw');
+      foreach($dsid_raw as $dsid) {
+        if(substr($dsid, 0, 1) == '-') {
+          unset($datastreams[substr($dsid, 1)]);
+        }
+        else {
+          if(!empty($dsid)) {
+            $datastreams[$dsid] = $dsid;
           }
-          else {
-            $this->results[] = array(
-              'type' => 'error',
-              'pid' => $this->fedora_object->id,
-              'message' => "Datastream ($datastream) is missing",
-            );
-          }
+        }
+      }
+    }
+    //dsm($datastreams, 'dddddd');
+    $object_datastreams = $this->fedora_object->repository->api->a->listDatastreams($this->fedora_object->id);
+
+    foreach($datastreams as $dsid) {
+      if(!isset($object_datastreams[$dsid])) {
+        $this->results[] = array(
+          'type' => 'error',
+          'pid' => $this->fedora_object->id,
+          'dsid' => $dsid,
+          'message' => "Missing",
+        );
+      }
+      else {
+        $ds = $this->fedora_object[$dsid];
+        if(variable_get('islandora_utils_validate_object_settings_datastream_size_zero', '') && $ds->size == -1) {
+          $this->results[] = array(
+            'type' => 'error',
+            'pid' => $this->fedora_object->id,
+            'dsid' => $dsid,
+            'message' => "Size: Empty",
+          );
+        }
+        else {
+          $this->results[] = array(
+            'type' => 'status',
+            'pid' => $this->fedora_object->id,
+            'dsid' => $dsid,
+            'message' => "Size: $ds->size bytes",
+          );
         }
       }
     }

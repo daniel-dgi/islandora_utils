@@ -15,11 +15,8 @@ class ExportObjectPlugin extends IslandoraUtilsPlugin {
     module_load_include('inc', 'islandora', 'includes/IslandoraTuque');
     module_load_include('inc', 'islandora', 'includes/utilities');
 
-
-
     dsm($this->form_state,'ffffffffgggggg');
     $values = $this->form_state['values'];
-
 
     if($values['islandora_utils_plugin_export_download']) {
       //download object to computer

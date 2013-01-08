@@ -16,7 +16,7 @@ function islandora_utils_plugin_validate_object_islandora_utils_plugin() {
 
 
 function islandora_utils_plugin_validate_object_form_alter(&$form, &$form_state, $form_id) {
-  //dsm($form_id,'form id');
+  dsm($form_state, 'form state');
   switch ($form_id) {
     case 'islandora_utils_settings_form':
     //case 'islandora_utils_form':
@@ -29,27 +29,73 @@ function islandora_utils_plugin_validate_object_form_alter(&$form, &$form_state,
         '#collapsed' => FALSE,
         );
 
-       $form['islandora_utils_plugin_options']['islandora_utils_validate_object_settings']['islandora_utils_validate_object_settings_content_models'] = array(
-        '#type' => 'textfield',
-        '#title' => t('Content Model make this into a table form'),
-        '#default_value' => variable_get('islandora_utils_validate_object_settings_content_models', ''),
-        );
+      if(isset($form_state['triggering_element'])) {
+        if($form_state['triggering_element']['#button_id'] == 'islandora-utils-settings-validate-add-content-model') {
+          unset($form_state['triggering_element']['#button_id']);
+          $content_model = $form_state['values']['islandora_utils_validate_object_settings_content_models_name'];
+          $dsids_raw = $form_state['values']['islandora_utils_validate_object_settings_content_models_ds'];
+          dsm('fire twice');
+          if(!empty($content_model) && !empty($dsids_raw)) {
 
-       $form['islandora_utils_plugin_options']['islandora_utils_validate_object_settings']['islandora_utils_validate_object_settings_datastream_ids'] = array(
-        '#type' => 'textfield',
-        '#title' => t('Datastreams ids'),
-        '#description' => t('Space seperated list of datastreams for the above content model'),
-        '#default_value' => variable_get('islandora_utils_validate_object_settings_datastream_ids', ''),
+            $dsids_raw = explode(' ', trim($dsids_raw));
+            $dsids = array();
+
+            foreach ($dsids_raw as $dsid) {
+              if(!empty($dsid)) {
+                $dsids[] = $dsid;
+              }
+            }
+
+            $dsids = implode(' ', $dsids);
+            if(!empty($dsids)) {
+              $fields = array(
+                'content_model_name' => $content_model,
+                'content_model_datastreams' => $dsids,
+              );
+
+              $content_model_id = db_insert('islandora_utils_plugin_validate_object_content_models')
+                ->fields($fields)
+                ->execute();
+            }
+          }
+        }
+      }
+
+      $rows = array();
+      $results = db_query('SELECT content_model_id, content_model_name, content_model_datastreams FROM {islandora_utils_plugin_validate_object_content_models}');
+      foreach($results as $row) {
+       $rows[$row->content_model_id] = array($row->content_model_name, $row->content_model_datastreams);
+      }
+
+      $form['islandora_utils_plugin_options']['islandora_utils_validate_object_settings']['islandora_utils_validate_object_settings_content_models'] = array(
+        '#type' => 'tableselect',
+        '#header' => array(t('Content Model'), t('Datastreams'),),
+        '#options' => $rows,
+        '#empty' => t('No members available.'),
       );
 
-       $form['islandora_utils_plugin_options']['islandora_utils_validate_object_settings']['add_content_model'] = array(
+
+      $form['islandora_utils_plugin_options']['islandora_utils_validate_object_settings']['islandora_utils_validate_object_settings_content_models_name'] = array(
+        '#type' => 'textfield',
+         '#title' => t('Content Model'),
+         '#default_value' => '',
+      );
+
+      $form['islandora_utils_plugin_options']['islandora_utils_validate_object_settings']['islandora_utils_validate_object_settings_content_models_ds'] = array(
+        '#type' => 'textfield',
+         '#title' => t('Datastreams'),
+         '#default_value' => '',
+         '#description' => t('Space seperated list of DSIDs. Use -DSID to ingore a DSID from the content model'),
+      );
+
+      $form['islandora_utils_plugin_options']['islandora_utils_validate_object_settings']['add_content_model'] = array(
         '#type' => 'button',
         '#value' => t('Add Content Model'),
-        '#suffix' => '</div>',
+        '#button_id' => 'islandora-utils-settings-validate-add-content-model',
         '#ajax' => array(
           'event' => 'click',
           'callback' => 'islandora_utils_validate_object_settings_add_content_model',
-          'wrapper' => 'islandora_utils_validate_object_settings',
+          'wrapper' => 'islandora-utils-settings-form',
           'method' => 'replace',
         ),
       );
@@ -71,4 +117,9 @@ function islandora_utils_plugin_validate_object_form_alter(&$form, &$form_state,
     break;
   }
 
+}
+
+function islandora_utils_validate_object_settings_add_content_model($form, &$form_state) {
+
+  return drupal_rebuild_form('islandora_utils_settings_form', $form_state, $form);
 }

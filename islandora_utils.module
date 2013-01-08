@@ -46,30 +46,88 @@ function islandora_utils_admin_page($tab = '') {
 }
 
 function islandora_utils_form($form, &$form_state) {
-  $form = array();
+
+  $form = array(
+    '#prefix' => '<div id="islandora-utils-form">',
+    '#suffix' => '</div>',
+  );
 
   $form['islandora_utils_query'] = array(
     '#type' => 'fieldset',
     '#title' => t('RI Query'),
     '#collapsible' => TRUE,
     '#collapsed' => FALSE,
-    );
+  );
+
+  $query_name = '';
+  $queryy = 'select $object from <#ri>
+     where
+     $object <fedora-model:state> <info:fedora/fedora-system:def/model#Active>
+     and $object <fedora-model:hasModel> <info:fedora/islandora:pageCModel>
+     order by $object';
+
+  if(isset($form_state['triggering_element']['#button_id'])) {
+    if ($form_state['triggering_element']['#button_id'] == 'islandora-utils-query-select') {
+      $query_id = $form_state['values']['islandora_utils_query_history'];
+      dsm($form_state,'form state in trigger');
+      dsm($form, 'form');
+      dsm($query_id, 'query id');
+      if($query_id != 0) {
+        $result = db_select('islandora_utils_query_history', 'query')
+          ->fields('query', array('query_id', 'query_name', 'query'))
+          ->condition('query_id', $query_id, '=')
+          ->execute()
+          ->fetchAssoc();
+
+        if(is_array($result)) {
+
+          $form_state['input']['islandora_utils_query_query'] = $result['query'];
+          $form_state['input']['islandora_utils_query_name'] = $result['query_name'];
+        }
+      }
+      else {
+        $form_state['input']['islandora_utils_query_query'] = '';
+        $form_state['input']['islandora_utils_query_name'] = '';
+      }
+    }
+  }
 
   $form['islandora_utils_query']['islandora_utils_query_query'] = array(
     '#type' => 'textarea',
     '#title' => t('Query'),
-    '#default_value' => 'select $object from <#ri>
-     where
-     $object <fedora-model:state> <info:fedora/fedora-system:def/model#Active>
-     and $object <fedora-model:hasModel> <info:fedora/islandora:pageCModel>
-     order by $object',
-    //
+    '#default_value' => $query,
     );
 
+  $form['islandora_utils_query']['islandora_utils_query_name'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Query Name'),
+    '#default_value' => $query_name,
+  );
+
+  $results = db_select('islandora_utils_query_history', 'query')
+    ->fields('query', array('query_id', 'query_name', 'query'))
+    ->orderBy('query_id', 'DESC')
+    ->execute()
+    ->fetchAllAssoc('query_id');
+
+  $options = array();
+  $options[0] = t('New...');
+  foreach ($results as $key => $value) {
+    $options[$key] = $value->query_name;
+  }
+
   $form['islandora_utils_query']['islandora_utils_query_history'] = array(
-    '#type' => 'item',
-    '#markup' => t('save query history to db'),
-    );
+    '#type' => 'select',
+    '#title' => t('Query History'),
+    '#options' => $options,
+    '#button_id' => 'islandora-utils-query-select',
+        '#ajax' => array(
+          'event' => 'change',
+          'callback' => 'islandora_utils_query_change',
+          'wrapper' => 'islandora-utils-form',
+          'method' => 'replace',
+        ),
+  );
 
   $form['islandora_utils_pids'] = array(
     '#type' => 'textarea',
@@ -115,10 +173,44 @@ function islandora_utils_form($form, &$form_state) {
   return $form;
 }
 
+function islandora_utils_query_change($form, &$form_state) {
 
+  return drupal_rebuild_form('islandora_utils_form', $form_state, $form);
+}
 function islandora_utils_form_submit($form, &$form_state) {
+  dsm($form_state, 'bob');
   module_load_include('inc', 'islandora', 'includes/tuque');
   module_load_include('inc', 'islandora', 'includes/utilities');
+
+  if($form_state['values']['islandora_utils_query_history'] == 0 && $form_state['values']['islandora_utils_query_name'] != '' && $form_state['values']['islandora_utils_query_query'] != '') {
+    $result = db_select('islandora_utils_query_history', 'query')
+      ->fields('query', array('query_id', 'query'))
+      ->orderBy('query_id', 'DESC')
+      ->range(0,1)
+      ->execute()
+      ->fetchAssoc();
+
+    $query = '';
+    if(isset($result)) {
+      $query = $result['query'];
+    }
+
+    if($query != $form_state['values']['islandora_utils_query_query'] && $form_state['values']['islandora_utils_query_query'] != '') {
+      $fields = array(
+        'query_name' => $form_state['values']['islandora_utils_query_name'],
+        'query' => $form_state['values']['islandora_utils_query_query'],
+      );
+
+      $query_id = db_insert('islandora_utils_query_history')
+        ->fields($fields)
+        ->execute();
+    }
+  }
+
+
+  dsm($form_state, 'forrrrr');
+  $pids = islandora_utils_get_pids($form_state);
+  $plugins = islandora_utils_get_plugins($form_state);
 
   $batch = array(
     'title' => t('Process Batch'),
@@ -126,30 +218,23 @@ function islandora_utils_form_submit($form, &$form_state) {
     'finished' => 'islandora_utils_process_complete',
   );
 
+  foreach ($plugins as $plugin) {
+    foreach ($pids as $pid) {
+      $batch['operations'][] = array('islandora_utils_process_object', array($pid, $plugin, $form_state));
+    }
+    reset($pids);
+  }
+  if(count($pids) > 0 && count($plugins) > 0) {
+    batch_set($batch);
+  }
 
-  $batch['operations'][] = array('islandora_utils_getpids', array($form_state));
-  $batch['operations'][] = array('islandora_utils_process_objects', array($form_state));
-
-  //foreach ($pids as $pid) {
-    //$batch['operations'][] = array('islandora_utils_bob2', $pid);
-  //}
-  //$batch['operations'][] = array('islandora_utils_bob2', $form_state);
-
-  //$batch['operations'][] = array('islandora_utils_process_objects', $form_state);
-
-  batch_set($batch);
-  //return $form;
 }
 
-function islandora_utils_bob2($pid, &$context) {
-  dsm($pid, 'pid');
-}
 
-function islandora_utils_getpids($form_state, &$context) {
+function islandora_utils_get_pids($form_state) {
   module_load_include('inc', 'islandora', 'includes/tuque');
   module_load_include('inc', 'islandora', 'includes/utilities');
 
-  $context['message'] = "Compiling PIDS";
   $pids = array();
   $values = $form_state['values'];
 
@@ -170,7 +255,6 @@ function islandora_utils_getpids($form_state, &$context) {
         $pids[$pid] = $pid;
       }
     }
-
   }
 
   $pids_raw = explode(' ', $values['islandora_utils_pids']);
@@ -180,15 +264,148 @@ function islandora_utils_getpids($form_state, &$context) {
       $pids[$pid] = $pid;
     }
   }
-  dsm($context, 'context');
-  $context['results']['pids'] = $pids;
-  foreach ($pids as $pid) {
 
+  return $pids;
+
+}
+
+function islandora_utils_get_plugins($form_state) {
+  module_load_include('inc', 'islandora', 'includes/IslandoraTuque');
+  module_load_include('inc', 'islandora', 'includes/utilities');
+
+  $plugins_raw = $form_state['storage']['plugins'];
+  $plugins = array();
+
+  foreach($plugins_raw as $plugin => $details) {
+    if($form_state['values']["plugin-$plugin"]) {
+      if($details['module'] && $details['file']) {
+        $path = drupal_get_path('module', $details['module']) . '/' . $details['file'];
+        if(is_readable($path)) {
+          require_once($path);
+          $plugin_class = $details['class'];
+          $plugin_function = $details['function'];
+
+          if (class_exists($plugin_class)) {
+            $implementation = new $plugin_class();
+
+            if(method_exists($implementation, $plugin_function)) {
+              $plugins[$plugin] = $details;
+              unset($implementation);
+            }
+            else {
+              dsm('func is missing');
+            }
+          }
+          else {
+              dsm('class is missing');
+          }
+        }
+        else {
+          dsm('file is not readable');
+        }
+      }
+    }
+  }
+  return $plugins;
+}
+
+function islandora_utils_process_object($pid, $plugin, $form_state, &$context) {
+  $plugin_class = $plugin['class'];
+  $plugin_function = $plugin['function'];
+
+  $path = drupal_get_path('module', $plugin['module']) . '/' . $plugin['file'];
+  require_once($path);
+
+  $implementation = new $plugin_class($pid, $form_state);
+  $implementation->$plugin_function();
+
+  if(!isset($context['results']['results'])) {
+    $context['results']['results'] = array();
+  }
+
+  $context['results']['results'] = array_merge($context['results']['results'], $implementation->get_results()); //$context['results'][] = $implementation->get_results();
+  $context['message'] = "Running $plugin_class => $plugin_function with PID $pid";
+}
+
+function islandora_utils_process_complete($success, $results, $operations) {
+  islandora_utils_write_result($results['results']);
+}
+
+/**
+ *
+ * @param type $results
+ *  array (
+ *    array(
+ *      type(status/error)
+ *      pid
+ *      message
+ *    )
+ * )
+ */
+function islandora_utils_write_result($results = array()) {
+  global $base_url;
+  //drupal_get_messages('status');
+  //drupal_get_messages('error');
+  if(count($results) > 0) {
+    if(variable_get('islandora_utils_output_settings_sort', '')) {
+      foreach ($results as $key => $row) {
+        $results_sorted[$key]  = $row['type'];
+      }
+      $results_sorted = array_map('strtolower', $results_sorted);
+      array_multisort($results_sorted, SORT_ASC, $results);
+    }
+
+
+    if(variable_get('islandora_utils_output_settings_output_file', '')) {
+      $file_name = 'islandora_utils_'.date('Y-m-d-h:i:s').'.txt';
+      $file_dir = variable_get('file_public_path', file_directory_temp());
+      $results_file = file_create_filename($file_name, $file_dir);
+      $fp = fopen($results_file, 'w');
+    }
+    foreach($results as $result) {
+      if($result['type'] == 'status' && !variable_get('islandora_utils_output_settings_output_everything', '')) {
+        continue;
+      }
+
+      if(variable_get('islandora_utils_output_settings_output_screen', '')) {
+        drupal_set_message('<pre>'.$result['type'] . "\t" . $result['pid'] . "\t" . $result['dsid'] . "\t" . $result['message'].'</pre>', 'status');
+      }
+      if(variable_get('islandora_utils_output_settings_output_file', '')) {
+        $text = $result['type'] . "\t" . $result['pid'] . "\t" . $result['dsid'] . "\t" . $result['message'];
+        fwrite($fp, $text."\r");
+      }
+    }
+
+    if(variable_get('islandora_utils_output_settings_output_file', '')) {
+      fclose($fp);
+      drupal_set_message(t('View results here >> '.l('View', $base_url.'/'.$results_file)));
+    }
+  }
+  else {
+    drupal_set_message(t('No resultsssss'));
   }
 
 }
 
-function islandora_utils_process_objects($form_state, &$context) {
+function islandora_utils_clean_result_files() {
+  //foreach file in drupal file dir that starts with islandora_utilites - unlink
+}
+
+/**
+ * Implements hook_CMODEL_PID_islandora_view_object().
+ */
+function islandora_utils_newspapers_issueCModel_islandora_view_object($object, $page_number, $page_size) {
+  dsm($object->id,'object');
+  $viewer_url = variable_get('islandora_base_url', '') . '/get/' . $object->id . '/islandora:viewerSdef/getViewer';
+  $output = '<iframe src="' . $viewer_url . '" frameborder="0" style="width: 100%; height: 800px;">Errors: unable to load viewer</iframe>';
+
+  return $output;
+}
+
+
+
+
+function islandora_utils_process_ooooollldddd($form_state, &$context) {
   module_load_include('inc', 'islandora', 'includes/IslandoraTuque');
   module_load_include('inc', 'islandora', 'includes/utilities');
 
@@ -231,20 +448,7 @@ function islandora_utils_process_objects($form_state, &$context) {
     }
   }
 
-  if(!isset($context['sandbox']['max'])) {
-    $context['sandbox']['max'] = 0;
-  }
-
-  if(!isset($context['sandbox']['progress'])) {
-    $context['sandbox']['progress'] = 0;
-  }
-
-
-  //add drupal batch here
   foreach($plugins as $plugin) {
-    dsm($context['sandbox']['max'], 'max');
-    $context['sandbox']['max'] += count($pids);
-
     foreach($pids as $pid) {
       $context['sandbox']['progress']++;
 
@@ -255,97 +459,7 @@ function islandora_utils_process_objects($form_state, &$context) {
       }
 
       $context['results']['results'] = array_merge($context['results']['results'], $result);
-      $context['message'] = "Running " . $plugin['plugin_class'] ."=>". $plugin['plugin_function'];
+      $context['message'] = "Running " . $plugin['plugin_class'] ."=>". $plugin['plugin_function'] . " on $pid";
     }
   }
-}
-
-function islandora_utils_process_object($pid, $plugin, $form_state) {
-
-  $plugin_class = $plugin['class'];
-  $plugin_function = $plugin['function'];
-
-  $path = drupal_get_path('module', $plugin['module']) . '/' . $plugin['file'];
-  require_once($path);
-
-  $implementation = new $plugin_class($pid, $form_state);
-  $implementation->$plugin_function();
-
-  return $implementation->get_results();
-}
-
-function islandora_utils_process_complete($success, $results, $operations) {
-  dsm($results,'complete function');
-  islandora_utils_write_result($results['results']);
-}
-
-/**
- *
- * @param type $results
- *  array (
- *    array(
- *      type(status/error)
- *      pid
- *      message
- *    )
- * )
- */
-function islandora_utils_write_result($results = array()) {
-  global $base_url;
-  //drupal_get_messages('status');
-  //drupal_get_messages('error');
-  if(count($results) > 0) {
-    if(variable_get('islandora_utils_output_settings_sort', '')) {
-      foreach ($results as $key => $row) {
-        $results_sorted[$key]  = $row['type'];
-      }
-      $results_sorted = array_map('strtolower', $results_sorted);
-      array_multisort($results_sorted, SORT_ASC, $results);
-    }
-
-
-    if(variable_get('islandora_utils_output_settings_output_file', '')) {
-      $file_name = 'islandora_utils_'.date('Y-m-d-h:i:s').'.txt';
-      $file_dir = variable_get('file_public_path', file_directory_temp());
-      $results_file = file_create_filename($file_name, $file_dir);
-      $fp = fopen($results_file, 'w');
-    }
-    foreach($results as $result) {
-      if($result['type'] == 'status' && !variable_get('islandora_utils_output_settings_output_everything', '')) {
-        continue;
-      }
-
-      if(variable_get('islandora_utils_output_settings_output_screen', '')) {
-        drupal_set_message('<pre>'.$result['type'] . "\t" . $result['pid'] . "\t" . $result['message'].'</pre>', 'status');
-      }
-      if(variable_get('islandora_utils_output_settings_output_file', '')) {
-        $text = $result['type'] . "\t" . $result['pid'] . "\t" . $result['message'];
-        fwrite($fp, $text."\r");
-      }
-    }
-
-    if(variable_get('islandora_utils_output_settings_output_file', '')) {
-      fclose($fp);
-      drupal_set_message(t('View results here >> '.l('View', $base_url.'/'.$results_file)));
-    }
-  }
-  else {
-    drupal_set_message(t('No resultsssss'));
-  }
-
-}
-
-function islandora_utils_clean_result_files() {
-  //foreach file in drupal file dir that starts with islandora_utilites - unlink
-}
-
-/**
- * Implements hook_CMODEL_PID_islandora_view_object().
- */
-function islandora_utils_newspapers_issueCModel_islandora_view_object($object, $page_number, $page_size) {
-  dsm($object->id,'object');
-  $viewer_url = variable_get('islandora_base_url', '') . '/get/' . $object->id . '/islandora:viewerSdef/getViewer';
-  $output = '<iframe src="' . $viewer_url . '" frameborder="0" style="width: 100%; height: 800px;">Errors: unable to load viewer</iframe>';
-
-  return $output;
 }

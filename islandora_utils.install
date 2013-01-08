@@ -1,0 +1,30 @@
+<?php
+
+function islandora_utils_schema() {
+
+  $schema['islandora_utils_query_history'] = array(
+    'description' => 'stores itql query history',
+    'fields' => array(
+      'query_id' => array(
+        'description' => 'The ID of the record',
+        'type' => 'serial',
+        'length' => 11,
+        'not null' => TRUE,
+      ),
+      'query_name' => array(
+        'description' => 'name of query',
+        'type' => 'text',
+        'not null' => TRUE,
+      ),
+      'query' => array(
+        'description' => 'the query',
+        'type' => 'text',
+        'not null' => TRUE,
+      ),
+    ),
+    'primary key' => array('query_id'),
+
+  );
+
+  return $schema;
+}

@@ -4,6 +4,12 @@ function islandora_utils_settings_form($form, &$form_state) {
   global $user;
   module_load_include('inc', 'islandora', 'includes/IslandoraTuque');
 
+  $form = array(
+    '#prefix' => '<div id="islandora-utils-settings-form">',
+    '#suffix' => '</div>',
+  );
+
+
   if(variable_get('islandora_utils_remote_islandora_base_url', '')) {
     $url = variable_get('islandora_utils_remote_islandora_base_url', '');
     if(!variable_get('islandora_utils_remote_islandora_drupal_filter', '')) {
@@ -151,12 +157,6 @@ function islandora_utils_settings_form($form, &$form_state) {
   return system_settings_form($form);//$form;
 
 }
-
-function islandora_utils_validate_object_settings_add_content_model($form, &$form_state) {
-  //do some processing
-
-}
-
 
 function islandora_utils_settings_submit($form, &$form_state) {
   /*
