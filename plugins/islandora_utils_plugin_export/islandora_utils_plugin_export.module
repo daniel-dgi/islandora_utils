@@ -26,12 +26,32 @@ function islandora_utils_plugin_export_form_alter(&$form, &$form_state, $form_id
         '#collapsed' => FALSE,
       );
 
-      $form['islandora_utils_plugin_options']['islandora_utils_plugin_export']['islandora_utils_plugin_export_download'] = array(
+      $form['islandora_utils_plugin_options']['islandora_utils_plugin_export']['islandora_utils_plugin_export_download_remote'] = array(
         '#type' => 'checkbox',
-        '#title' => t('Download object'),
-        '#default_value' => variable_get('islandora_utils_plugin_export_download', ''),
+        '#title' => t('Download object from remote'),
+        '#default_value' => variable_get('islandora_utils_plugin_export_download_remote', ''),
       );
 
+      $form['islandora_utils_plugin_options']['islandora_utils_plugin_export']['islandora_utils_plugin_export_download_local'] = array(
+        '#type' => 'checkbox',
+        '#title' => t('Download object from local'),
+        '#default_value' => variable_get('islandora_utils_plugin_export_download_local', ''),
+      );
+
+      $form['islandora_utils_plugin_options']['islandora_utils_plugin_export']['islandora_utils_plugin_export_ingest_local'] = array(
+        '#type' => 'checkbox',
+        '#title' => t('Remote to local'),
+        '#default_value' => variable_get('islandora_utils_plugin_export_ingest_local', ''),
+        '#description' => t('Select run query of remote if querying PIDS with RI'),
+      );
+
+      $form['islandora_utils_plugin_options']['islandora_utils_plugin_export']['islandora_utils_plugin_export_ingest_local_purge'] = array(
+        '#type' => 'checkbox',
+        '#title' => t('Purge local PID'),
+        '#default_value' => variable_get('islandora_utils_plugin_export_ingest_local_purge', ''),
+        '#description' => t('First purge local PID when syncing remote to local'),
+      );
+      /*
       $form['islandora_utils_plugin_options']['islandora_utils_plugin_export']['islandora_utils_plugin_export_download_version'] = array(
         '#type' => 'checkbox',
         '#title' => t('Download object -- all versions'),
@@ -44,29 +64,32 @@ function islandora_utils_plugin_export_form_alter(&$form, &$form_state, $form_id
         '#default_value' => variable_get('islandora_utils_plugin_export_ingest_remote', ''),
       );
 
-      $form['islandora_utils_plugin_options']['islandora_utils_plugin_export']['islandora_utils_plugin_export_ingest_local'] = array(
-        '#type' => 'checkbox',
-        '#title' => t('Remote object to local islandora'),
-        '#default_value' => variable_get('islandora_utils_plugin_export_ingest_local', ''),
-      );
+      */
+
     break;
   }
 
 }
 
 function islandora_utils_plugin_export_islandora_utils_plugin_process_complete($results = NULL) {
-  $export = $results['plugin_export'];
 
-  $file_name = 'structure.txt';
-  $file_dir = $export['download_file_dir'];
-  $structure_file = file_create_filename($file_name, $file_dir);
-  $fp = fopen($structure_file, 'w');
+  if(isset($results['plugin_export'])) {
+    $export = $results['plugin_export'];
 
-  foreach ($export['file_list'] as $key => $value) {
-    $text = $value['pid'] . "\t" . $value['dsid'] . "\t" . $value['label'] . "\t" . $value['mimetype'] . "\t" . $value['filename'];
-    fwrite($fp, $text."\r");
+    $file_name = 'structure.txt';
+    $file_dir_uri = $export['download_file_dir_uri'];
+    $structure_file = file_create_filename($file_name, $file_dir_uri);
+    $fp = fopen($structure_file, 'w');
+
+    foreach ($export['file_list'] as $key => $value) {
+      $text = $value['pid'] . "\t" . $value['dsid'] . "\t" . $value['label'] . "\t" . $value['mimetype'] . "\t" . $value['filename'];
+      fwrite($fp, $text."\r");
+    }
+    fclose($fp);
+
+    $tar = new ArchiverTar($file_dir_uri . '.tar');
+    $tar->add($file_dir_uri);
+
+    drupal_set_message('Your file can be downloaded ' . l('here.', file_create_url($file_dir_uri . '.tar')), 'status');
   }
-  fclose($fp);
-
-
 }

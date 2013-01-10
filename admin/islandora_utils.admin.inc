@@ -14,8 +14,14 @@ function islandora_utils_settings_form($form, &$form_state) {
     $url = variable_get('islandora_utils_remote_islandora_base_url', '');
     if(!variable_get('islandora_utils_remote_islandora_drupal_filter', '')) {
       $remote_user = new stdClass();
-      $remote_user->name = variable_get('islandora_utils_remote_islandora_username', 'fedoraAdmin');
-      $remote_user->pass = variable_get('islandora_utils_remote_islandora_password', 'fedoraAdmin');
+      $remote_user->name = variable_get('islandora_utils_remote_islandora_username', NULL);
+      $remote_user->pass = variable_get('islandora_utils_remote_islandora_password', NULL);
+      if(!$remote_user->name) {
+        $remote_user->uid = 0;
+      }
+      else {
+        $remote_user->uid = -1;
+      }
       $remote_user->uid = -1;
     }
     else {
@@ -26,37 +32,38 @@ function islandora_utils_settings_form($form, &$form_state) {
 
     try {
       $info = $remote_connection->api->a->describeRepository();
-
+      dsm($info, 'infffffooo');
     }
     catch (RepositoryException $e) {
       $info = FALSE;
+    }
 
 
-      if ($info) {
-        try {
-          $dc = $remote_connection->api->m->getDatastream('fedora-system:ContentModel-3.0', 'DC');
-        }
-        catch (RepositoryException $e) {
-          $dc = FALSE;
-        }
+    if ($info) {
+      try {
+        $dc = $remote_connection->api->m->getDatastream('fedora-system:ContentModel-3.0', 'DC');
       }
+      catch (RepositoryException $e) {
+        $dc = FALSE;
+      }
+    }
 
-      if ($info) {
-        if ($dc) {
-          $confirmation_message = '<img src="' . url('misc/watchdog-ok.png') . '"/>'
-            . t('Successfully connected to Fedora Server (Version !version).', array('!version' => $info['repositoryVersion']));
-        }
-        else {
-          $confirmation_message = '<img src="' . url('misc/watchdog-warning.png') . '"/>'
-            . t('Unable to authenticate when connecting to to Fedora Server (Version !version). Please configure the !filter.', array('!version' => $info['repositoryVersion'], '!filter' => 'Drupal Filter'));
-        }
+    if ($info) {
+      if ($dc) {
+        $confirmation_message = '<img src="' . url('misc/watchdog-ok.png') . '"/>'
+          . t('Successfully connected to Fedora Server (Version !version).', array('!version' => $info['repositoryVersion']));
       }
       else {
-        $confirmation_message = '<img src="' . url('misc/watchdog-error.png') . '"/> '
-          . t('Unable to connect to Fedora server at !islandora_url', array('!islandora_url' => $url));
+        $confirmation_message = '<img src="' . url('misc/watchdog-warning.png') . '"/>'
+          . t('Unable to authenticate when connecting to to Fedora Server (Version !version). Please configure the !filter.', array('!version' => $info['repositoryVersion'], '!filter' => 'Drupal Filter'));
       }
-      unset($remote_connection);
     }
+    else {
+      $confirmation_message = '<img src="' . url('misc/watchdog-error.png') . '"/> '
+        . t('Unable to connect to Fedora server at !islandora_url', array('!islandora_url' => $url));
+    }
+    unset($remote_connection);
+
   }
   else {
     $confirmation_message = '<img src="' . url('misc/watchdog-warning.png') . '"/>'
@@ -94,16 +101,6 @@ function islandora_utils_settings_form($form, &$form_state) {
     '#default_value' => variable_get('islandora_utils_output_settings_output_file', ''),
     '#description' => t("Dumps file into the drupal files dir"),
   );
-
-
-  $query = "select \$object from <#ri>
-    where
-    \$object <fedora-model:state> <info:fedora/fedora-system:def/model#Active>
-    and \$object <fedora-model:hasModel> <info:fedora/fedora-system:ContentModel-3.0
-
-  order by \$object";
-
-  $connection = new IslandoraTuque();
 
   $form['islandora_utils_remote'] = array(
     '#type' => 'fieldset',
@@ -148,7 +145,7 @@ function islandora_utils_settings_form($form, &$form_state) {
 
   $form['islandora_utils_remote']['islandora_utils_remote_validate_connection'] = array(
     '#type' => 'item',
-    '#title' => t('Validate remote connection'),
+    '#title' => t('Remote connection'),
     '#markup' => $confirmation_message,
   );
 

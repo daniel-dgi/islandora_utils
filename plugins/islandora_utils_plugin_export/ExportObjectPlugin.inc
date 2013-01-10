@@ -6,7 +6,7 @@ class ExportObjectPlugin extends IslandoraUtilsPlugin {
   /**
    * Constructor
    */
-  function ExportObjectPlugin($pid = NULL, $form_state = NULL, &$context = NULL) {
+  function ExportObjectPlugin($pid = NULL, &$form_state = NULL, &$context = NULL) {
     parent::__construct($pid, $form_state, $context);
   }
 
@@ -16,34 +16,178 @@ class ExportObjectPlugin extends IslandoraUtilsPlugin {
     module_load_include('inc', 'islandora', 'includes/utilities');
 
     $values = $this->form_state['values'];
+    $datastreams = array();
 
-    if($values['islandora_utils_plugin_export_download']) {
+    if($values['islandora_utils_plugin_export_download_local'] || $values['islandora_utils_plugin_export_download_remote']) {
       if(!isset($this->context['results']['plugin_export']['download_file_dir'])) {
-        $file_dir =  'public://islandora_utils_plugin_export-' . date('Y-m-d-h-i-s');
-        drupal_mkdir($file_dir);
+        $file_dir = 'islandora_utils_plugin_export-' . date('Y-m-d-H-i-s');
+        $file_dir_uri = "public://$file_dir";
+        drupal_mkdir($file_dir_uri);
         //$file_name = 'islandora_utils_export'.date('Y-m-d-h:i:s').'.txt';
         //$file_dir = variable_get('file_public_path', file_directory_temp());
         //$results_file = file_create_filename($file_name, $file_dir);
 
         $this->context['results']['plugin_export']['download_file_dir'] = $file_dir;
+        $this->context['results']['plugin_export']['download_file_dir_uri'] = $file_dir_uri;
       }
 
       if(!isset($this->context['results']['plugin_export']['file_list'])) {
         $this->context['results']['plugin_export']['file_list'] = array();
       }
-      $datastreams = $this->fedora_object->repository->api->a->listDatastreams($this->fedora_object->id);
+
+      if($values['islandora_utils_plugin_export_download_local'])  {
+        try {
+          $datastreams = $this->local_connection->api->a->listDatastreams($this->pid);
+        } catch (Exception $exc) {
+          $this->results[] = array(
+            'type' => 'error',
+            'pid' => $this->pid,
+            'dsid' => $dsid,
+            'message' => 'List datastreams for local object FAILED',
+          );
+        }
+
+
+      }
+      elseif($values['islandora_utils_plugin_export_download_remote']) {
+        try {
+          $datastreams = $this->remote_connection->api->a->listDatastreams($this->pid);
+        } catch (Exception $exc) {
+          $this->results[] = array(
+            'type' => 'error',
+            'pid' => $this->pid,
+            'dsid' => $dsid,
+            'message' => 'List datastreams for remote object FAILED',
+          );
+        }
+
+
+      }
+
+
+      if(count($datastreams) == 0) {
+        $this->results[] = array(
+          'type' => 'error',
+          'pid' => $this->pid,
+          'dsid' => $dsid,
+          'message' => 'No datastreams returned',
+        );
+      }
 
       foreach ($datastreams as $dsid => $datastream) {
-        $file_name = $this->fedora_object->id . '-' . $dsid;
+        $file_name = $this->pid . '-' . $dsid;
         $this->context['results']['plugin_export']['file_list'][] = array(
-          'pid' => $this->fedora_object->id,
+          'pid' => $this->pid,
           'dsid' => $dsid,
           'label' => $datastream['label'],
           'mimetype' => $datastream['mimetype'],
           'filename' => $file_name,
         );
-        $ds_content = $this->fedora_object->repository->api->a->getDatastreamDissemination($this->fedora_object->id, $dsid);
-        file_put_contents($this->context['results']['plugin_export']['download_file_dir'] . '/'. $file_name, $ds_content);
+
+        if($values['islandora_utils_plugin_export_download_local'])  {
+          try {
+            $ds_content = $this->local_connection->api->a->getDatastreamDissemination($this->pid, $dsid);
+            $this->results[] = array(
+              'type' => 'status',
+              'pid' => $this->pid,
+              'dsid' => $dsid,
+              'message' => 'Export from local Islandora SUCCESSFUL',
+            );
+          } catch (Exception $exc) {
+            $this->results[] = array(
+              'type' => 'error',
+              'pid' => $this->pid,
+              'dsid' => $dsid,
+              'message' => "Export from local Islandora FAILED",
+            );
+          }
+        }
+        elseif($values['islandora_utils_plugin_export_download_remote']) {
+          try {
+            $ds_content = $this->remote_connection->api->a->getDatastreamDissemination($this->pid, $dsid);
+            $this->results[] = array(
+              'type' => 'status',
+              'pid' => $this->pid,
+              'dsid' => $dsid,
+              'message' => 'Export from remote Islandora SUCCESSFUL',
+            );
+          } catch (Exception $exc) {
+            $this->results[] = array(
+              'type' => 'error',
+              'pid' => $this->pid,
+              'dsid' => $dsid,
+              'message' => "Export from remote Islandora FAILED",
+            );
+          }
+
+
+        }
+        if($ds_content) {
+          if(file_put_contents($this->context['results']['plugin_export']['download_file_dir_uri'] . '/'. $file_name, $ds_content) === FALSE) {
+            $this->results[] = array(
+              'type' => 'error',
+              'pid' => $this->pid,
+              'dsid' => $dsid,
+              'message' => "Save file locally FAILED",
+            );
+          }
+        }
+      }
+    }
+
+    if($values['islandora_utils_plugin_export_ingest_local']) {
+      if($values['islandora_utils_plugin_export_ingest_local_purge']) {
+        if(islandora_object_load($this->pid)) {
+          try {
+            $this->local_connection->api->m->purgeObject($this->pid);
+          } catch (Exception $exc) {
+            $this->results[] = array(
+              'type' => 'error',
+              'pid' => $this->pid,
+              'dsid' => 'n/a',
+              'message' => "Purge from local Islandora FAILED",
+            );
+          }
+        }
+      }
+
+      try {
+        $export_foxml = $this->remote_connection->api->m->export($this->pid);
+      } catch (Exception $exc) {
+        $this->results[] = array(
+          'type' => 'error',
+          'pid' => $this->pid,
+          'dsid' => 'n/a',
+          'message' => "Export object from remote Islandora FAILED",
+        );
+      }
+
+      if($export_foxml) {
+        $this->results[] = array(
+          'type' => 'status',
+          'pid' => $this->pid,
+          'dsid' => 'n/a',
+          'message' => "Export object from remote Islandora SUCCESSFUL",
+        );
+        try {
+          $params['string'] = $export_foxml;
+          $ingest = $this->local_connection->api->m->ingest($params);
+        } catch (Exception $exc) {
+          $this->results[] = array(
+            'type' => 'error',
+            'pid' => $this->pid,
+            'dsid' => 'n/a',
+            'message' => "Local ingest from remote Islandora FAILED",
+          );
+        }
+        if($ingest) {
+          $this->results[] = array(
+            'type' => 'status',
+            'pid' => $this->pid,
+            'dsid' => 'n/a',
+            'message' => "Local ingest from remote islandora SUCCESSFUL",
+          );
+        }
       }
     }
     /*

@@ -66,10 +66,12 @@ function islandora_utils_form($form, &$form_state) {
      $object <fedora-model:state> <info:fedora/fedora-system:def/model#Active>
      and $object <fedora-model:hasModel> <info:fedora/islandora:pageCModel>
      order by $object';
+  if(isset($form_state['values'])) {
+    $query_id = $form_state['values']['islandora_utils_query_history'];
+  }
 
-  if(isset($form_state['triggering_element']['#button_id'])) {
+  if(isset($form_state['triggering_element'])) {
     if ($form_state['triggering_element']['#button_id'] == 'islandora-utils-query-select') {
-      $query_id = $form_state['values']['islandora_utils_query_history'];
       if($query_id != 0) {
         $result = db_select('islandora_utils_query_history', 'query')
           ->fields('query', array('query_id', 'query_name', 'query'))
@@ -78,7 +80,6 @@ function islandora_utils_form($form, &$form_state) {
           ->fetchAssoc();
 
         if(is_array($result)) {
-
           $form_state['input']['islandora_utils_query_query'] = $result['query'];
           $form_state['input']['islandora_utils_query_name'] = $result['query_name'];
         }
@@ -87,6 +88,14 @@ function islandora_utils_form($form, &$form_state) {
         $form_state['input']['islandora_utils_query_query'] = '';
         $form_state['input']['islandora_utils_query_name'] = '';
       }
+    }
+    elseif ($form_state['triggering_element']['#button_id'] == 'islandora-utils-query-history-remove') {
+      db_delete('islandora_utils_query_history')
+        ->condition('query_id', $query_id)
+        ->execute();
+      $query_id = 0;
+      $form_state['input']['islandora_utils_query_query'] = '';
+      $form_state['input']['islandora_utils_query_name'] = '';
     }
   }
 
@@ -100,10 +109,22 @@ function islandora_utils_form($form, &$form_state) {
       '#type' => 'textfield',
       '#title' => t('Query Name'),
       '#default_value' => $query_name,
-      '#description' => t('Specfic a name to save query'),
+      '#description' => t('Specify a name to save query'),
     );
   }
-
+  else {
+    $form['islandora_utils_query']['islandora_utils_query_history_remove'] = array(
+      '#type' => 'button',
+      '#default_value' => t('Remove'),
+      '#button_id' => 'islandora-utils-query-history-remove',
+      '#ajax' => array(
+        'event' => 'change',
+        'callback' => 'islandora_utils_query_history_remove',
+        'wrapper' => 'islandora-utils-form',
+        'method' => 'replace',
+      ),
+    );
+  }
 
   $results = db_select('islandora_utils_query_history', 'query')
     ->fields('query', array('query_id', 'query_name', 'query'))
@@ -122,27 +143,32 @@ function islandora_utils_form($form, &$form_state) {
     '#title' => t('Query History'),
     '#options' => $options,
     '#button_id' => 'islandora-utils-query-select',
-        '#ajax' => array(
-          'event' => 'change',
-          'callback' => 'islandora_utils_query_change',
-          'wrapper' => 'islandora-utils-form',
-          'method' => 'replace',
-        ),
+    '#ajax' => array(
+      'event' => 'change',
+      'callback' => 'islandora_utils_query_change',
+      'wrapper' => 'islandora-utils-form',
+      'method' => 'replace',
+    ),
+  );
+
+  $form['islandora_utils_query']['islandora_utils_query_remote'] = array(
+    '#type' => 'checkbox',
+    '#title' => t('Run query on remote islandora'),
   );
 
   $form['islandora_utils_pids'] = array(
     '#type' => 'textarea',
     '#title' => t('List of pids'),
     '#description' => t('space seperated list of pids'),
-    '#default_value' => 'islandora:299 islandora:313',
-    );
+    '#default_value' => 'islandora:299 islandora:313 codearl:9487 istories:4048 adr:20',
+  );
 
   $form['islandora_utils_plugins'] = array(
     '#type' => 'fieldset',
     '#title' => t('Plugins'),
     '#collapsible' => TRUE,
     '#collapsed' => FALSE,
-    );
+  );
 
   $plugins = module_invoke_all('islandora_utils_plugin');
   $form_state['storage']['plugins'] = $plugins;
@@ -150,12 +176,21 @@ function islandora_utils_form($form, &$form_state) {
   /**
    *
    * @todo make this re-arrangable for doing a order of operatations on a object
+   * @todo move options fieldset into ajax call back. only display options for the plugin if the plugin is selected
    */
+
   foreach($plugins as $plugin => $details) {
     $form['islandora_utils_plugins']["plugin-$plugin"] = array(
       '#type' => 'checkbox',
       '#title' => t($details['title']),
       '#description' => t($details['description']),
+      '#button_id' => "islandora-utils-plugins-plugin-$plugin",
+      /*'#ajax' => array(
+        'event' => 'change',
+        'callback' => 'islandora_utils_plugin_options',
+        'wrapper' => 'islandora-utils-form',
+        'method' => 'replace',
+      ),*/
     );
   }
 
@@ -174,10 +209,17 @@ function islandora_utils_form($form, &$form_state) {
   return $form;
 }
 
-function islandora_utils_query_change($form, &$form_state) {
 
+
+function islandora_utils_query_history_remove($form, &$form_state) {
   return drupal_rebuild_form('islandora_utils_form', $form_state, $form);
 }
+
+function islandora_utils_query_change($form, &$form_state) {
+  return drupal_rebuild_form('islandora_utils_form', $form_state, $form);
+}
+
+
 function islandora_utils_form_submit($form, &$form_state) {
   module_load_include('inc', 'islandora', 'includes/tuque');
   module_load_include('inc', 'islandora', 'includes/utilities');
@@ -216,7 +258,8 @@ function islandora_utils_form_submit($form, &$form_state) {
 }
 
 
-function islandora_utils_get_pids($form_state) {
+function islandora_utils_get_pids(&$form_state) {
+  global $user;
   module_load_include('inc', 'islandora', 'includes/tuque');
   module_load_include('inc', 'islandora', 'includes/utilities');
 
@@ -228,7 +271,22 @@ function islandora_utils_get_pids($form_state) {
   if (!empty($values['islandora_utils_query_query'])) {
     try {
       $query = $values['islandora_utils_query_query'];
-      $fedora = new IslandoraTuque();
+      $query_user = NULL;
+      $query_url = NULL;
+      if($values['islandora_utils_query_remote']) {
+        $query_url = variable_get('islandora_utils_remote_islandora_base_url', '');
+        if(!variable_get('islandora_utils_remote_islandora_drupal_filter', '')) {
+          $query_user = new stdClass();
+          $query_user->name = variable_get('islandora_utils_remote_islandora_username', 'fedoraAdmin');
+          $query_user->pass = variable_get('islandora_utils_remote_islandora_password', 'fedoraAdmin');
+          $query_user->uid = -1;
+        }
+        else {
+          $remote_user = $user;
+        }
+      }
+
+      $fedora = new IslandoraTuque($query_user, $query_url);
       $objects = $fedora->repository->ri->itqlQuery($query, 'unlimited', '0'); // for itql
     } catch (Exception $e) {
       drupal_set_message(t('Your ITQL query is invalid.'), 'error');
@@ -253,7 +311,7 @@ function islandora_utils_get_pids($form_state) {
 
 }
 
-function islandora_utils_get_plugins($form_state) {
+function islandora_utils_get_plugins(&$form_state) {
   module_load_include('inc', 'islandora', 'includes/IslandoraTuque');
   module_load_include('inc', 'islandora', 'includes/utilities');
 
@@ -290,6 +348,9 @@ function islandora_utils_get_plugins($form_state) {
       }
     }
   }
+
+  $form_state['storage']['plugins-use'] = $plugins;
+
   return $plugins;
 }
 
