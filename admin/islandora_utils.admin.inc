@@ -10,13 +10,13 @@ function islandora_utils_settings_form($form, &$form_state) {
   );
 
 
-  if(variable_get('islandora_utils_remote_islandora_base_url', '')) {
+  if (variable_get('islandora_utils_remote_islandora_base_url', '')) {
     $url = variable_get('islandora_utils_remote_islandora_base_url', '');
-    if(!variable_get('islandora_utils_remote_islandora_drupal_filter', '')) {
+    if (!variable_get('islandora_utils_remote_islandora_drupal_filter', '')) {
       $remote_user = new stdClass();
       $remote_user->name = variable_get('islandora_utils_remote_islandora_username', NULL);
       $remote_user->pass = variable_get('islandora_utils_remote_islandora_password', NULL);
-      if(!$remote_user->name) {
+      if (!$remote_user->name) {
         $remote_user->uid = 0;
       }
       else {
@@ -32,12 +32,10 @@ function islandora_utils_settings_form($form, &$form_state) {
 
     try {
       $info = $remote_connection->api->a->describeRepository();
-      dsm($info, 'infffffooo');
     }
     catch (RepositoryException $e) {
       $info = FALSE;
     }
-
 
     if ($info) {
       try {
@@ -126,7 +124,7 @@ function islandora_utils_settings_form($form, &$form_state) {
 
   $form['islandora_utils_remote']['islandora_utils_remote_islandora_drupal_filter'] = array(
     '#type' => 'checkbox',
-    '#title' => t('Use drupal filter'),
+    '#title' => t('Use drupal credentials'),
     '#default_value' => variable_get('islandora_utils_remote_islandora_drupal_filter', ''),
     '#description' => t('If checked, the import / export functionality will use your drupal user / password for authentication'),
   );
@@ -163,22 +161,22 @@ function islandora_utils_settings_submit($form, &$form_state) {
 
   variable_set('islandora_utils_remote_fedora_base_url', $values['fedora_base_url']);
 
-  if($values['fedora_base_url']) {
+  if ($values['fedora_base_url']) {
      variable_set('islandora_utils_remote_fedora_base_url', $values['fedora_base_url']);
   }
 
-  if($values['fedora_username']) {
+  if ($values['fedora_username']) {
      variable_set('islandora_utils_remote_fedora_username', $values['fedora_username']);
   }
 
-  if($values['drupal_filter']) {
+  if ($values['drupal_filter']) {
      variable_set('islandora_utils_remote_fedora_drupal_filter', $values['drupal_filter']);
   }
   else {
     variable_set('islandora_utils_remote_fedora_drupal_filter', NULL);
   }
 
-  if($values['fedora_password']) {
+  if ($values['fedora_password']) {
      variable_set('islandora_utils_remote_fedora_password', $values['fedora_password']);
   }
 

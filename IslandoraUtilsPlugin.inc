@@ -31,13 +31,13 @@ class IslandoraUtilsPlugin {
 
     $this->local_connection = new IslandoraTuque();
 
-    if(variable_get('islandora_utils_remote_islandora_base_url', '')) {
+    if (variable_get('islandora_utils_remote_islandora_base_url', '')) {
       $remote_url = variable_get('islandora_utils_remote_islandora_base_url', '');
-      if(!variable_get('islandora_utils_remote_islandora_drupal_filter', '')) {
+      if (!variable_get('islandora_utils_remote_islandora_drupal_filter', '')) {
         $remote_user = new stdClass();
         $remote_user->name = variable_get('islandora_utils_remote_islandora_username', NULL);
         $remote_user->pass = variable_get('islandora_utils_remote_islandora_password', NULL);
-        if(!$remote_user->name) {
+        if (!$remote_user->name) {
           $remote_user->uid = 0;
         }
         else {
@@ -64,7 +64,7 @@ class IslandoraUtilsPlugin {
   }
 
   protected function save_result($result = array()) {
-    if(isset($result['type']) && isset($result['pid']) && isset($result['message'])) {
+    if (isset($result['type']) && isset($result['pid']) && isset($result['message'])) {
       $this->results[] = $result;
     }
   }

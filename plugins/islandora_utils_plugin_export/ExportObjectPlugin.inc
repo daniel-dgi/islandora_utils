@@ -18,8 +18,8 @@ class ExportObjectPlugin extends IslandoraUtilsPlugin {
     $values = $this->form_state['values'];
     $datastreams = array();
 
-    if($values['islandora_utils_plugin_export_download_local'] || $values['islandora_utils_plugin_export_download_remote']) {
-      if(!isset($this->context['results']['plugin_export']['download_file_dir'])) {
+    if ($values['islandora_utils_plugin_export_download_local'] || $values['islandora_utils_plugin_export_download_remote']) {
+      if (!isset($this->context['results']['plugin_export']['download_file_dir'])) {
         $file_dir = 'islandora_utils_plugin_export-' . date('Y-m-d-H-i-s');
         $file_dir_uri = "public://$file_dir";
         drupal_mkdir($file_dir_uri);
@@ -31,11 +31,11 @@ class ExportObjectPlugin extends IslandoraUtilsPlugin {
         $this->context['results']['plugin_export']['download_file_dir_uri'] = $file_dir_uri;
       }
 
-      if(!isset($this->context['results']['plugin_export']['file_list'])) {
+      if (!isset($this->context['results']['plugin_export']['file_list'])) {
         $this->context['results']['plugin_export']['file_list'] = array();
       }
 
-      if($values['islandora_utils_plugin_export_download_local'])  {
+      if ($values['islandora_utils_plugin_export_download_local'])  {
         try {
           $datastreams = $this->local_connection->api->a->listDatastreams($this->pid);
         } catch (Exception $exc) {
@@ -49,7 +49,7 @@ class ExportObjectPlugin extends IslandoraUtilsPlugin {
 
 
       }
-      elseif($values['islandora_utils_plugin_export_download_remote']) {
+      elseif ($values['islandora_utils_plugin_export_download_remote']) {
         try {
           $datastreams = $this->remote_connection->api->a->listDatastreams($this->pid);
         } catch (Exception $exc) {
@@ -60,12 +60,9 @@ class ExportObjectPlugin extends IslandoraUtilsPlugin {
             'message' => 'List datastreams for remote object FAILED',
           );
         }
-
-
       }
 
-
-      if(count($datastreams) == 0) {
+      if (count($datastreams) == 0) {
         $this->results[] = array(
           'type' => 'error',
           'pid' => $this->pid,
@@ -84,7 +81,7 @@ class ExportObjectPlugin extends IslandoraUtilsPlugin {
           'filename' => $file_name,
         );
 
-        if($values['islandora_utils_plugin_export_download_local'])  {
+        if ($values['islandora_utils_plugin_export_download_local'])  {
           try {
             $ds_content = $this->local_connection->api->a->getDatastreamDissemination($this->pid, $dsid);
             $this->results[] = array(
@@ -102,7 +99,7 @@ class ExportObjectPlugin extends IslandoraUtilsPlugin {
             );
           }
         }
-        elseif($values['islandora_utils_plugin_export_download_remote']) {
+        elseif ($values['islandora_utils_plugin_export_download_remote']) {
           try {
             $ds_content = $this->remote_connection->api->a->getDatastreamDissemination($this->pid, $dsid);
             $this->results[] = array(
@@ -122,8 +119,8 @@ class ExportObjectPlugin extends IslandoraUtilsPlugin {
 
 
         }
-        if($ds_content) {
-          if(file_put_contents($this->context['results']['plugin_export']['download_file_dir_uri'] . '/'. $file_name, $ds_content) === FALSE) {
+        if ($ds_content) {
+          if (file_put_contents($this->context['results']['plugin_export']['download_file_dir_uri'] . '/' . $file_name, $ds_content) === FALSE) {
             $this->results[] = array(
               'type' => 'error',
               'pid' => $this->pid,
@@ -135,9 +132,9 @@ class ExportObjectPlugin extends IslandoraUtilsPlugin {
       }
     }
 
-    if($values['islandora_utils_plugin_export_ingest_local']) {
-      if($values['islandora_utils_plugin_export_ingest_local_purge']) {
-        if(islandora_object_load($this->pid)) {
+    if ($values['islandora_utils_plugin_export_ingest_local']) {
+      if ($values['islandora_utils_plugin_export_ingest_local_purge']) {
+        if (islandora_object_load($this->pid)) {
           try {
             $this->local_connection->api->m->purgeObject($this->pid);
           } catch (Exception $exc) {
@@ -162,7 +159,7 @@ class ExportObjectPlugin extends IslandoraUtilsPlugin {
         );
       }
 
-      if($export_foxml) {
+      if ($export_foxml) {
         $this->results[] = array(
           'type' => 'status',
           'pid' => $this->pid,
@@ -180,7 +177,7 @@ class ExportObjectPlugin extends IslandoraUtilsPlugin {
             'message' => "Local ingest from remote Islandora FAILED",
           );
         }
-        if($ingest) {
+        if ($ingest) {
           $this->results[] = array(
             'type' => 'status',
             'pid' => $this->pid,
@@ -191,15 +188,15 @@ class ExportObjectPlugin extends IslandoraUtilsPlugin {
       }
     }
     /*
-    if($values['islandora_utils_plugin_export_ingest_remote']) {
-      if($this->pid) {
+    if ($values['islandora_utils_plugin_export_ingest_remote']) {
+      if ($this->pid) {
         $this->fedora_object = islandora_object_load($this->pid);
       }
 
       //ingest local object in remote fedora
-      if(variable_get('islandora_utils_remote_islandora_base_url', '')) {
+      if (variable_get('islandora_utils_remote_islandora_base_url', '')) {
         $url = variable_get('islandora_utils_remote_islandora_base_url', '');
-        if(!variable_get('islandora_utils_remote_islandora_drupal_filter', '')) {
+        if (!variable_get('islandora_utils_remote_islandora_drupal_filter', '')) {
           $remote_user = new stdClass();
           $remote_user->name = variable_get('islandora_utils_remote_islandora_username', 'fedoraAdmin');
           $remote_user->pass = variable_get('islandora_utils_remote_islandora_password', 'fedoraAdmin');
@@ -220,12 +217,12 @@ class ExportObjectPlugin extends IslandoraUtilsPlugin {
       }
     }
 
-    if($values['islandora_utils_plugin_export_ingest_local']) {
+    if ($values['islandora_utils_plugin_export_ingest_local']) {
       dsm('ingest local');
       //functionize this bit of code
-      if(variable_get('islandora_utils_remote_islandora_base_url', '')) {
+      if (variable_get('islandora_utils_remote_islandora_base_url', '')) {
         $url = variable_get('islandora_utils_remote_islandora_base_url', '');
-        if(!variable_get('islandora_utils_remote_islandora_drupal_filter', '')) {
+        if (!variable_get('islandora_utils_remote_islandora_drupal_filter', '')) {
           $remote_user = new stdClass();
           $remote_user->name = variable_get('islandora_utils_remote_islandora_username', 'fedoraAdmin');
           $remote_user->pass = variable_get('islandora_utils_remote_islandora_password', 'fedoraAdmin');

@@ -40,7 +40,7 @@ function islandora_utils_plugin_export_form_alter(&$form, &$form_state, $form_id
 
       $form['islandora_utils_plugin_options']['islandora_utils_plugin_export']['islandora_utils_plugin_export_ingest_local'] = array(
         '#type' => 'checkbox',
-        '#title' => t('Remote to local'),
+        '#title' => t('Sync remote to local'),
         '#default_value' => variable_get('islandora_utils_plugin_export_ingest_local', ''),
         '#description' => t('Select run query of remote if querying PIDS with RI'),
       );
@@ -73,7 +73,7 @@ function islandora_utils_plugin_export_form_alter(&$form, &$form_state, $form_id
 
 function islandora_utils_plugin_export_islandora_utils_plugin_process_complete($results = NULL) {
 
-  if(isset($results['plugin_export'])) {
+  if (isset($results['plugin_export'])) {
     $export = $results['plugin_export'];
 
     $file_name = 'structure.txt';
@@ -83,13 +83,12 @@ function islandora_utils_plugin_export_islandora_utils_plugin_process_complete($
 
     foreach ($export['file_list'] as $key => $value) {
       $text = $value['pid'] . "\t" . $value['dsid'] . "\t" . $value['label'] . "\t" . $value['mimetype'] . "\t" . $value['filename'];
-      fwrite($fp, $text."\r");
+      fwrite($fp, $text . "\r");
     }
     fclose($fp);
 
     $tar = new ArchiverTar($file_dir_uri . '.tar');
     $tar->add($file_dir_uri);
-
-    drupal_set_message('Your file can be downloaded ' . l('here.', file_create_url($file_dir_uri . '.tar')), 'status');
+    drupal_set_message(t('Your file can be downloaded ' . l('here.', file_create_url($file_dir_uri . '.tar'), array('attributes' => array('target' => '_blank')))), 'status');
   }
 }

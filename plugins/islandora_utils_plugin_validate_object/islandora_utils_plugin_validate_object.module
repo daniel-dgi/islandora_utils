@@ -28,25 +28,25 @@ function islandora_utils_plugin_validate_object_form_alter(&$form, &$form_state,
         '#collapsed' => FALSE,
         );
 
-      if(isset($form_state['triggering_element'])) {
-        if($form_state['triggering_element']['#button_id'] == 'islandora-utils-settings-validate-add-content-model') {
+      if (isset($form_state['triggering_element'])) {
+        if ($form_state['triggering_element']['#button_id'] == 'islandora-utils-settings-validate-add-content-model') {
           unset($form_state['triggering_element']['#button_id']);
           $content_model = $form_state['values']['islandora_utils_validate_object_settings_content_models_name'];
           $dsids_raw = $form_state['values']['islandora_utils_validate_object_settings_content_models_ds'];
           dsm('fire twice');
-          if(!empty($content_model) && !empty($dsids_raw)) {
+          if (!empty($content_model) && !empty($dsids_raw)) {
 
             $dsids_raw = explode(' ', trim($dsids_raw));
             $dsids = array();
 
             foreach ($dsids_raw as $dsid) {
-              if(!empty($dsid)) {
+              if (!empty($dsid)) {
                 $dsids[] = $dsid;
               }
             }
 
             $dsids = implode(' ', $dsids);
-            if(!empty($dsids)) {
+            if (!empty($dsids)) {
               $fields = array(
                 'content_model_name' => $content_model,
                 'content_model_datastreams' => $dsids,
@@ -62,13 +62,13 @@ function islandora_utils_plugin_validate_object_form_alter(&$form, &$form_state,
 
       $rows = array();
       $results = db_query('SELECT content_model_id, content_model_name, content_model_datastreams FROM {islandora_utils_plugin_validate_object_content_models}');
-      foreach($results as $row) {
+      foreach ($results as $row) {
        $rows[$row->content_model_id] = array($row->content_model_name, $row->content_model_datastreams);
       }
 
       $form['islandora_utils_plugin_options']['islandora_utils_validate_object_settings']['islandora_utils_validate_object_settings_content_models'] = array(
         '#type' => 'tableselect',
-        '#header' => array(t('Content Model'), t('Datastreams'),),
+        '#header' => array(t('Content Model'), t('Datastreams'), ),
         '#options' => $rows,
         '#empty' => t('No members available.'),
       );
@@ -103,7 +103,7 @@ function islandora_utils_plugin_validate_object_form_alter(&$form, &$form_state,
          '#type' => 'checkbox',
           '#title' => t('Merge datastream ids with requirments from object content models'),
           '#default_value' => variable_get('islandora_utils_validate_object_settings_datastream_ids_merge', ''),
-          '#description' => t('Checking this will validate against all DS ids from the content model, with the addional ones mentioned above '),
+          '#description' => t('Checking this will validate against all DS ids from the content model, with the addional ones mentioned above'),
        );
 
        $form['islandora_utils_plugin_options']['islandora_utils_validate_object_settings']['islandora_utils_validate_object_settings_datastream_size_zero'] = array(
