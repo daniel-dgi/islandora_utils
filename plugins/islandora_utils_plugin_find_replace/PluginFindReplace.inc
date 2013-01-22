@@ -12,13 +12,17 @@ class PluginFindReplace extends IslandoraUtilsPlugin {
 
 
   public function process() {
+    dd($this->pid, 'pppppDDDDD');
     module_load_include('inc', 'islandora', 'includes/IslandoraTuque');
     module_load_include('inc', 'islandora', 'includes/utilities');
 
 
-    dsm('find replace process function');
-    dsm($this->form_state,'ffffffffgggggg');
-    $values = $this->form_state['values'];
+    $this->results[] = array(
+      'type' => 'error',
+      'pid' => $this->pid,
+      'dsid' => 'n/a',
+      'message' => 'find...replace... test',
+    );
   }
 
 

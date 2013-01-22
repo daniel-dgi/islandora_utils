@@ -106,13 +106,6 @@ function islandora_utils_settings_form($form, &$form_state) {
     '#description' => t("Used for importing and exporting objects and datastream between two fedora instances"),
     '#collapsible' => TRUE,
     '#collapsed' => FALSE,
-    );
-
-  $form['islandora_utils_remote']['islandora_utils_remote_islandora_enable'] = array(
-    '#type' => 'checkbox',
-    '#title' => t('Enable remote connection'),
-    '#default_value' => variable_get('islandora_utils_remote_islandora_enable', ''),
-    '#description' => t('Do we need this? Recommend turing this off when not in use'),
   );
 
   $form['islandora_utils_remote']['islandora_utils_remote_islandora_base_url'] = array(
@@ -122,10 +115,10 @@ function islandora_utils_settings_form($form, &$form_state) {
     '#description' => t('Rest API'),
   );
 
-  $form['islandora_utils_remote']['islandora_utils_remote_islandora_drupal_filter'] = array(
+  $form['islandora_utils_remote']['islandora_utils_remote_islandora_drupal_creds'] = array(
     '#type' => 'checkbox',
     '#title' => t('Use drupal credentials'),
-    '#default_value' => variable_get('islandora_utils_remote_islandora_drupal_filter', ''),
+    '#default_value' => variable_get('islandora_utils_remote_islandora_drupal_creds', ''),
     '#description' => t('If checked, the import / export functionality will use your drupal user / password for authentication'),
   );
   $form['islandora_utils_remote']['islandora_utils_remote_islandora_username'] = array(
