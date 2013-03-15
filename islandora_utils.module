@@ -9,17 +9,13 @@ function islandora_utils_menu() {
   $items['admin/islandora/utils'] = array(
     'title' => 'Islandora Utils',
     'description' => 'Advanced admin functionality for Islandora',
-    'page callback' => 'islandora_utils_admin_page',
-    'page arguments' => array('home'),
+    'page callback' => 'drupal_get_form',
+    'page arguments' => array('islandora_utils_form'),
     'access callback' => TRUE,
   );
 
-  $items['admin/islandora/utils/home'] = array(
+  $items['admin/islandora/utils/'] = array(
     'title' => 'Home',
-    'description' => 'Islandora Utility settings',
-    'page callback' => 'islandora_utils_admin_page',
-    'page arguments' => array('home'),
-    'access callback' => TRUE,
     'type' => MENU_DEFAULT_LOCAL_TASK,
   );
 
@@ -34,15 +30,6 @@ function islandora_utils_menu() {
   );
 
   return $items;
-}
-
-function islandora_utils_admin_page($tab = '') {
-  switch ($tab) {
-    case 'home' :
-    default :
-      $output = drupal_get_form('islandora_utils_form');
-  }
-  return $output;
 }
 
 function islandora_utils_form($form, &$form_state) {
@@ -73,8 +60,8 @@ function islandora_utils_form($form, &$form_state) {
   if (isset($form_state['triggering_element'])) {
     if ($form_state['triggering_element']['#button_id'] == 'islandora-utils-query-select') {
       if ($query_id != 0) {
-        $result = db_select('islandora_utils_query_history', 'query')
-          ->fields('query', array('query_id', 'query_name', 'query'))
+        $result = db_select('islandora_utils_query_history', 'q')
+          ->fields('q', array('query_id', 'query_name', 'query'))
           ->condition('query_id', $query_id, '=')
           ->execute()
           ->fetchAssoc();
@@ -127,8 +114,8 @@ function islandora_utils_form($form, &$form_state) {
     );
   }
 
-  $results = db_select('islandora_utils_query_history', 'query')
-    ->fields('query', array('query_id', 'query_name', 'query'))
+  $results = db_select('islandora_utils_query_history', 'q')
+    ->fields('q')
     ->orderBy('query_id', 'DESC')
     ->execute()
     ->fetchAllAssoc('query_id');
@@ -203,6 +190,13 @@ function islandora_utils_form($form, &$form_state) {
     );
   }
 
+  if(count($plugins) == 0) {
+    $form['islandora_utils_plugins']['no_plugin'] = array(
+      '#type' => 'item',
+      '#markup' => t('Please enable at least on plugin under modules.'),
+    );
+  }
+
   $form['islandora_utils_plugin_options'] = array(
     '#type' => 'fieldset',
     '#title' => t('Plugin options'),
@@ -218,8 +212,6 @@ function islandora_utils_form($form, &$form_state) {
   return $form;
 }
 
-
-
 function islandora_utils_query_history_remove($form, &$form_state) {
   return drupal_rebuild_form('islandora_utils_form', $form_state, $form);
 }
@@ -229,37 +221,55 @@ function islandora_utils_query_change($form, &$form_state) {
 }
 
 
+function islandora_utils_form_validate($form, &$form_state) {
+  $plugins = islandora_utils_get_plugins($form_state);
+
+  if(count($plugins) == 0) {
+    form_set_error('', t('Please select at least one plugin'));
+  }
+  else {
+    //$form_state['storgage']['plugins'] = $plugins;
+  }
+}
+
 function islandora_utils_form_submit($form, &$form_state) {
+  global $user;
   module_load_include('inc', 'islandora', 'includes/tuque');
   module_load_include('inc', 'islandora', 'includes/utilities');
-
-  if ($form_state['values']['islandora_utils_query_history'] == 0 && $form_state['values']['islandora_utils_query_name'] != '' && $form_state['values']['islandora_utils_query_query'] != '') {
+  $values = $form_state['values'];
+  if ($values['islandora_utils_query_history'] == 0 && $values['islandora_utils_query_name'] != '' && $values['islandora_utils_query_query'] != '') {
     $fields = array(
-      'query_name' => $form_state['values']['islandora_utils_query_name'],
-      'query' => $form_state['values']['islandora_utils_query_query'],
+      'query_name' => $values['islandora_utils_query_name'],
+      'query' => $values['islandora_utils_query_query'],
     );
     $query_id = db_insert('islandora_utils_query_history')
       ->fields($fields)
       ->execute();
   }
 
-  $plugins = islandora_utils_get_plugins($form_state);
+  $plugins = $form_state['storage']['plugins-use'];
 
-  if(count($plugins) > 0) {
-    islandora_utils_get_pids($form_state, $plugins);
-  }
-  else {
-    drupal_set_message(t('Please select at least one plugin'), 'error');
-  }
+  $batch = array(
+    'title' => t('Process Request'),
+    'operations' => array(),
+  );
+
+  $batch['operations'][] = array('islandora_utils_get_pids', array($form_state));
+
+  batch_set($batch);
+
 }
 
 
-function islandora_utils_get_pids(&$form_state, $plugins) {
+function islandora_utils_get_pids($form_state, &$context) {
+  dsm($context, 'get pids');
   global $user;
   module_load_include('inc', 'islandora', 'includes/tuque');
+  module_load_include('inc', 'islandora', 'includes/utilities');
   $values = $form_state['values'];
 
   if (!empty($values['islandora_utils_query_query'])) {
+    dsm('querrrrr');
     try {
       $query = $values['islandora_utils_query_query'];
       $query_user = NULL;
@@ -284,84 +294,58 @@ function islandora_utils_get_pids(&$form_state, $plugins) {
       $count_result = $fedora->repository->ri->itqlQuery($count_query, 'unlimitied', 0);
 
       $total = $count_result[0]['k0']['value'];
+      dsm($total, 'total');
       if($total > 0) {
         $num_batch = ceil($total / $batch_size);
 
         dd($total, 'total');
         dd($num_batch, 'num of batch');
+
         $batch = array(
-          'title' => t('Process ITQL Query'),
+          'title' => t('Process ITQL'),
           'operations' => array(),
-          'finished' => 'islandora_utils_get_pids_complete',
+          //'finished' => 'islandora_utils_get_pids_complete',
         );
 
-        for($i = 1; $i <= 2; $i++) { //for($i = 1; $i <= $num_batch; $i++) {
+        for($i = 1; $i <= $num_batch; $i++) { //for($i = 1; $i <= 2; $i++) { //
+          dsm('get queries');
           $batch['operations'][] = array('islandora_utils_process_query', array($query, $batch_size, $fedora, $form_state));
         }
         batch_set($batch);
+
       }
     } catch (Exception $e) {
       drupal_set_message(t('Your ITQL query is invalid.'), 'error');
     }
   }
-  else {
-    islandora_utils_get_pids_complete($form_state);
+
+  if($values['islandora_utils_pids']) {
+    $pids_raw = explode(' ', $values['islandora_utils_pids']);
+    foreach ($pids_raw as $pid) {
+      if (islandora_is_valid_pid($pid)) {
+        dsm($pid, 'ddd');
+        $context['results']['pids'] = array_merge($context['results']['pids'], $pid);
+        //$pids[$pid] = $pid;
+      }
+    }
   }
 
+  $batch = array(
+    'title' => t('Process PIDS'),
+    'operations' => array(),
+  );
 
+  $batch['operations'][] = array('islandora_utils_process_pids', array($form_state));
 
+  batch_set($batch);
 }
 
-function islandora_utils_get_pids_complete($success, $results = NULL, $operations = NULL) {
-  module_load_include('inc', 'islandora', 'includes/utilities');
-  $pids = array();
-
-  if($results == NULL && $operations == NULL) {
-    if (isset($success['values'])) {
-      $values = $success['values'];
-    }
-    $plugins = $success['storage']['plugins-use'];
-    $form_state = $success;
-  }
-  else {
-    $pids = array_merge($pids, $results['pids']);
-    $form_state = $results['form_state'];
-    $values = $form_state['values'];
-    dsm($results, 'fffff');
-    $plugins = $form_state['storage']['plugins-use'];
-  }
-  dsm($pids, 'pids before');
-  $pids_raw = explode(' ', $values['islandora_utils_pids']);
-  foreach ($pids_raw as $pid) {
-    if (islandora_is_valid_pid($pid)) {
-      $pids[$pid] = $pid;
-    }
-  }
-  dsm($pids, 'ffffffffdfdfdfdf');
-  dsm($plugins, 'bggggggggg');
-  if (count($pids) > 0) {
-    unset($batch);
-    $batch = array(
-      'title' => t('Process Batch'),
-      'operations' => array(),
-      'finished' => 'islandora_utils_process_complete',
-    );
-
-    foreach ($plugins as $plugin) {
-      foreach ($pids as $pid) {
-        $batch['operations'][] = array('islandora_utils_process_pid', array($pid, $plugin, $form_state));
-      }
-      reset($pids);
-    }
-
-    batch_set($batch);
-  }
-  else {
-    drupal_set_message(t('Please select at least one PID'), 'error');
-  }
+function islandora_utils_process_pids($form_state, &$context) {
+  dsm($context, 'context in process pids');
 }
 
 function islandora_utils_process_query($query, $batch_size, $fedora, $form_state, &$context) {
+  dsm('query');
   $pids = array();
   $results = $fedora->repository->ri->itqlQuery($query, 1, 0);
 
@@ -527,6 +511,57 @@ function islandora_utils_write_result($results = array()) {
 function islandora_utils_clean_result_files() {
   //foreach file in drupal file dir that starts with islandora_utilites - unlink
 }
+
+function islandora_utils_get_pids_complete($success, $results = NULL, $operations = NULL) {
+  module_load_include('inc', 'islandora', 'includes/utilities');
+  $pids = array();
+
+  if($results == NULL && $operations == NULL) {
+    if (isset($success['values'])) {
+      $values = $success['values'];
+    }
+    $plugins = $success['storage']['plugins-use'];
+    $form_state = $success;
+  }
+  else {
+    $pids = array_merge($pids, $results['pids']);
+    $form_state = $results['form_state'];
+    $values = $form_state['values'];
+    dsm($results, 'fffff');
+    $plugins = $form_state['storage']['plugins-use'];
+  }
+  dsm($pids, 'pids before');
+  $pids_raw = explode(' ', $values['islandora_utils_pids']);
+  foreach ($pids_raw as $pid) {
+    if (islandora_is_valid_pid($pid)) {
+      $pids[$pid] = $pid;
+    }
+  }
+  dsm($pids, 'ffffffffdfdfdfdf');
+  dsm($plugins, 'bggggggggg');
+  if (count($pids) > 0) {
+    unset($batch);
+    $batch = array(
+      'title' => t('Process Batch'),
+      'operations' => array(),
+      'finished' => 'islandora_utils_process_complete',
+    );
+
+    foreach ($plugins as $plugin) {
+      foreach ($pids as $pid) {
+        $batch['operations'][] = array('islandora_utils_process_pid', array($pid, $plugin, $form_state));
+      }
+      reset($pids);
+    }
+
+    batch_set($batch);
+  }
+  else {
+    drupal_set_message(t('Please select at least one PID'), 'error');
+  }
+}
+
+
 
 /**
  * Implements hook_CMODEL_PID_islandora_view_object().
